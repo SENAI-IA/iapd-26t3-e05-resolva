@@ -58,5 +58,12 @@ Credenciais devem ser configuradas localmente e não devem ser versionadas.
 
 ## Documentação
 
-- [Desenho do produto, arquitetura, stack e ciclo de vida dos tickets](docs/superpowers/specs/2026-11-05-resolva-design.md).
+A configuração nativa do Kiro IDE fica em `.kiro/`:
+
+- [Regras ativas do projeto](.kiro/steering/project-rules.md).
+- [Arquitetura vigente](.kiro/steering/architecture.md).
+- [Requisitos do MVP](.kiro/specs/resolva-mvp/requirements.md).
+- [Design do MVP](.kiro/specs/resolva-mvp/design.md).
+- [Plano de implementação](.kiro/specs/resolva-mvp/tasks.md).
+
 - [Convenções da organização SENAI-IA](https://github.com/SENAI-IA/.github/blob/main/profile/README.md).

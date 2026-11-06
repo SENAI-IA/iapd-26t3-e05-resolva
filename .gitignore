@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+.idea/
+.vscode/
+.DS_Store
+
+# Cópias de trabalho e artefatos gerados por execuções do agente.
+.resolva/
+workspaces/
+artifacts/

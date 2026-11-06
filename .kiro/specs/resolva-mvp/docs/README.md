@@ -1,0 +1,18 @@
+# Documentação do Resolva
+
+Base relida após a atualização do produto: `main` no commit `1c645e26ce67c634a3c255c434fefaec67160f63`. Estado: planejamento, sem aplicação executável.
+
+| Documento | Uso |
+| --- | --- |
+| [PRD](../PRD.md) | Produto, objetivos, prioridades, hipóteses e aceite |
+| [Viabilidade](viabilidade.md) | Parecer, riscos, estimativa, custo desconhecido e fontes |
+| [Divisão do trabalho](divisao-trabalho.md) | Donos propostos, pacotes, dependências, cards e marcos |
+| [Rastreabilidade](rastreabilidade.md) | R01–R32/Q01–Q08 ligados às tarefas, cenários e evidências futuras |
+| [Planejamento de skills](planejamento-skills.md) | Procedimentos candidatos, guardrails e evals; nada instalado |
+| [Requisitos canônicos](../requirements.md) | Comportamentos verificáveis |
+| [Design canônico](../design.md) | Arquitetura, contratos, estados e limites |
+| [Tarefas canônicas](../tasks.md) | 31 tarefas preservadas e complemento de execução |
+
+Regras/arquitetura permanentes: [project-rules](../../../steering/project-rules.md) e [architecture](../../../steering/architecture.md). Não restaurar arquivos removidos nem criar uma segunda spec do mesmo MVP para manter este pacote.
+
+Documentos futuros previstos pelas tarefas, ainda não produzidos: `kiro-compatibility.md` (ensaio real), `demo.md` (cenários executados), `operations.md` (comandos efetivamente validados) e resultados de aceitação. Não preencher esses registros com resultados presumidos.

@@ -1,40 +1,30 @@
 # Resolva
 
-**Do ticket ao Pull Request com IA.**
+**Plataforma de engenharia de software assistida por IA.**
 
-Aplicação escolar que permite cadastrar tickets, iniciar uma investigação pela interface e acompanhar um agente de IA até a entrega de uma correção validada em um Pull Request real no GitHub.
+O Resolva transforma tickets técnicos em Pull Requests revisáveis. A plataforma coordena triagem baseada em evidências, encaminhamento manual, implementação, validação determinística e publicação controlada, mantendo a decisão final com a equipe de engenharia.
 
-O Kiro CLI headless investiga e altera o código. O backend do Resolva coordena a execução, valida as mudanças, registra evidências e publica o PR para revisão humana. Merge e alterações em produção permanecem sob responsabilidade do time.
+## Proposta de valor
 
-## Equipe
+O Resolva reduz o trabalho operacional entre o relato de um defeito e uma mudança pronta para revisão. O produto conecta contexto, evidência de reprodução, teste de regressão, validação do diff e entrega no GitHub em um fluxo auditável.
 
-- Organização: [SENAI-IA](https://github.com/SENAI-IA).
-- Turma: **IAPD-26T3**.
-- Grupo: **05**.
-- Equipe GitHub: [IAPD-26T3-E05](https://github.com/orgs/SENAI-IA/teams/iapd-26t3-e05).
-
-Membros vinculados à equipe no GitHub na criação deste repositório:
-
-- [SergioPacheco](https://github.com/SergioPacheco)
-- [FelipeRamosOliveira](https://github.com/FelipeRamosOliveira)
-- [lucasspecht-sn](https://github.com/lucasspecht-sn)
-- [amadeujw](https://github.com/amadeujw)
-- [larissasampaio-lcos](https://github.com/larissasampaio-lcos)
+O público inicial são equipes de engenharia que precisam acelerar correções de baixo risco sem abrir mão de escopo controlado, testes verificáveis, rastreabilidade e aprovação humana.
 
 ## Estado do projeto
 
-**Planejamento e design.** O repositório contém a documentação do produto. A aplicação ainda não foi implementada e não existem scripts de inicialização nesta fase.
+**MVP em planejamento e validação de produto.** A arquitetura, os contratos e os critérios de aceite estão definidos; a implementação e a validação ponta a ponta ainda serão executadas.
 
 ## Fluxo previsto
 
-1. Cadastrar um ticket com o problema e o comportamento esperado.
-2. Iniciar a análise visualmente.
-3. Investigar código e documentação com o Kiro.
-4. Reproduzir o problema com teste e implementar a correção.
-5. Executar a validação e abrir ou atualizar o PR.
-6. Revisar, fazer merge, verificar a correção em teste e encerrar o ticket manualmente.
+1. Cadastrar um ticket com o relato, comportamento esperado e contexto disponível.
+2. Analisar o ticket com a IA em modo somente leitura.
+3. Classificar a solicitação como falso positivo, entendimento incorreto, bug, melhoria ou inconclusiva.
+4. Explicar a conclusão no próprio ticket e, quando elegível, colocar bug ou melhoria na fila persistida.
+5. Iniciar manualmente a implementação de uma solicitação elegível.
+6. Reproduzir o bug ou validar os critérios da melhoria, implementar, testar e abrir ou atualizar o Pull Request.
+7. Revisar, fazer merge, verificar a correção em teste e encerrar o ticket manualmente.
 
-Informações insuficientes, falhas e impedimentos ficam registrados no histórico do ticket e de suas execuções.
+Cadastro, triagem, complementação e classificação não iniciam implementação automaticamente. Informações insuficientes, contradições, falhas e impedimentos ficam registrados no histórico do ticket e de suas execuções.
 
 ## Stack definida
 
@@ -52,11 +42,17 @@ O frontend seguirá uma identidade visual própria, adaptada ao domínio do Reso
 
 A aplicação está em planejamento; os comandos de instalação, migração e execução serão adicionados com a implementação.
 
-O ambiente previsto utiliza **Node.js 22**, **pnpm 10**, **Docker com Compose** e **Kiro CLI autenticado para execução headless**. Frontend, backend e Kiro rodarão no host; o PostgreSQL ficará no Docker. A demonstração completa exigirá um repositório alvo e acesso ao GitHub para publicar branches e abrir PRs.
+O ambiente previsto utiliza **Node.js 22**, **pnpm 10**, **Docker com Compose** e **Kiro CLI autenticado para execução headless**. Frontend, backend e Kiro rodarão no host; o PostgreSQL ficará no Docker. A operação completa exige um repositório-alvo controlado e acesso ao GitHub para publicar branches e abrir Pull Requests.
 
 Credenciais devem ser configuradas localmente e não devem ser versionadas.
 
 ## Documentação
+
+- [PRD do produto](.kiro/specs/resolva-mvp/PRD.md).
+- [Avaliação de viabilidade, riscos e estimativa](.kiro/specs/resolva-mvp/docs/viabilidade.md).
+- [Divisão do trabalho e marcos propostos](.kiro/specs/resolva-mvp/docs/divisao-trabalho.md).
+- [Rastreabilidade de requisitos, tarefas e evidências](.kiro/specs/resolva-mvp/docs/rastreabilidade.md).
+- [Planejamento de skills e guardrails](.kiro/specs/resolva-mvp/docs/planejamento-skills.md).
 
 A configuração nativa do Kiro IDE fica em `.kiro/`:
 
@@ -65,5 +61,3 @@ A configuração nativa do Kiro IDE fica em `.kiro/`:
 - [Requisitos do MVP](.kiro/specs/resolva-mvp/requirements.md).
 - [Design do MVP](.kiro/specs/resolva-mvp/design.md).
 - [Plano de implementação](.kiro/specs/resolva-mvp/tasks.md).
-
-- [Convenções da organização SENAI-IA](https://github.com/SENAI-IA/.github/blob/main/profile/README.md).

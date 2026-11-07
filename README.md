@@ -12,7 +12,7 @@ O público inicial são equipes de engenharia que precisam acelerar correções 
 
 ## Estado do projeto
 
-**Desenvolvimento iniciado.** A fundação inclui workspace pnpm, entrada React/Vite, API local Fastify com healthcheck e PostgreSQL via Docker Compose. Cadastro de tickets, persistência, triagem, executor e integração GitHub permanecem em implementação futura. O fluxo ponta a ponta ainda não está disponível.
+**Desenvolvimento iniciado.** A fundação inclui workspace pnpm, entrada React/Vite, API local Fastify, configuração validada com Zod e schema PostgreSQL/Drizzle com migrações. Cadastro de tickets, repositories, triagem, executor e integração GitHub permanecem em implementação futura. O fluxo ponta a ponta ainda não está disponível.
 
 ## Fluxo previsto
 
@@ -50,23 +50,35 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 # Edite .env e escolha uma senha local antes de iniciar o banco.
 pnpm db:up
+pnpm db:migrate
 pnpm dev
 ```
 
 A interface abre em `http://127.0.0.1:5173`. A API escuta em `http://127.0.0.1:3000`; `GET /rest/health` devolve `{"status":"ok"}`. O Vite encaminha `/rest` e `/trpc` para a API; ainda não há procedures tRPC. Host e Origin são restritos ao ambiente local, com headers de proxy desabilitados conforme a [configuração do Fastify](https://fastify.dev/docs/latest/Reference/Server/#trustproxy).
 
-O healthcheck confirma somente a disponibilidade HTTP. A interface e a API desta entrega podem rodar sem PostgreSQL, Kiro ou credencial GitHub. O PostgreSQL fica disponível em `127.0.0.1:5433`; altere `POSTGRES_PORT` e o mesmo valor em `DATABASE_URL` no `.env` se necessário. O banco ainda não possui schema nem migrações. Após criar o volume, mudanças de usuário/senha no `.env` não alteram as credenciais já inicializadas pelo PostgreSQL.
+O healthcheck confirma somente a disponibilidade HTTP. A interface e a API desta entrega podem rodar sem PostgreSQL, Kiro ou credencial GitHub. O PostgreSQL fica disponível em `127.0.0.1:5433`; altere `POSTGRES_PORT` e o mesmo valor em `DATABASE_URL` no `.env` se necessário. Após criar o volume, mudanças de usuário/senha no `.env` não alteram as credenciais já inicializadas pelo PostgreSQL.
+
+`pnpm db:migrate` lê o `.env` da raiz e aplica as migrações versionadas, sem executá-las automaticamente ao iniciar a API. O schema inclui tickets, triagens, histórico, execuções, entregas e artefatos. Importar os módulos de banco não abre conexões. Para gerar outra migração após alterar `backend/src/db/schema.ts`, use `pnpm db:generate` e revise o SQL gerado antes de aplicar. Esse fluxo usa [geração e aplicação explícitas de migrações Drizzle](https://orm.drizzle.team/docs/migrations).
 
 Para parar o banco preservando os dados, execute `pnpm db:down`. O volume nomeado é mantido; não use `docker compose down -v` se quiser preservá-lo.
 
 ```bash
 pnpm check          # tipos, lint, formatação, testes e build
+pnpm test:integration  # PostgreSQL descartável; exige Docker disponível
 pnpm format        # aplica a formatação
 pnpm --filter backend start  # inicia a API compilada após pnpm build
 docker compose --env-file .env.example config --quiet
 ```
 
-Os testes atuais verificam a API via injeção HTTP do Fastify, sem IA, rede ou banco. O pacote web ainda não possui testes de comportamento; seu script aceita a ausência de testes enquanto contém apenas a entrada estática. A verificação do Compose valida a configuração, sem iniciar o contêiner.
+Os testes unitários verificam a API via injeção HTTP e os validadores de configuração, sem IA nem banco. Os testes de integração usam [PostgreSQL via Testcontainers](https://github.com/testcontainers/testcontainers-node/blob/main/docs/modules/postgresql.md), com porta aleatória e recursos descartáveis; não leem `DATABASE_URL` do operador nem usam o volume da demonstração. O primeiro uso pode baixar imagens Docker. O pacote web ainda não possui testes de comportamento; seu script aceita a ausência de testes enquanto contém apenas a entrada estática. A verificação do Compose valida a configuração, sem iniciar o contêiner.
+
+## Configuração do projeto-alvo
+
+A configuração de IA é opcional nesta fase. Copie `config/resolva.config.example.json` para `resolva.config.json` na raiz e ajuste repositório, branch, modelo explícito e comandos quando houver um alvo separado. O exemplo espera um checkout em `targets/demo-target`; esse diretório e a configuração local são ignorados pelo Git. `RESOLVA_CONFIG_PATH` permite selecionar outro arquivo.
+
+Os caminhos são relativos ao arquivo de configuração. `allowedPaths`, `testPaths` e `documentationPaths` são diretórios dentro do alvo, sem caminhos absolutos, `..` ou globs. Testes devem ficar sob os diretórios permitidos inclusive após resolver symlinks; metadados Git, credenciais e configurações de agentes não são caminhos de escrita válidos. Workspaces e artefatos ficam fora do alvo, sem sobreposição. O carregamento verifica symlinks e os comandos devem ser objetos com executável, argumentos e `cwd`, sem strings de shell. `{reportPath}` é reservado ao backend para gerar o caminho dos relatórios de teste.
+
+`parseProjectConfig` valida a estrutura e os limites; `loadProjectConfig` acrescenta as verificações no sistema de arquivos. O carregamento não executa comandos. A existência da branch e a revalidação imediatamente antes dos efeitos serão responsabilidade do adaptador Git e do executor nas próximas entregas. A API atual ainda não inicia execuções nem utiliza esse arquivo automaticamente.
 
 A operação completa futura exige Kiro CLI autenticado, um repositório-alvo controlado e acesso ao GitHub para publicar branches e abrir Pull Requests. Frontend, backend e Kiro rodam no host; somente o PostgreSQL fica no Docker.
 

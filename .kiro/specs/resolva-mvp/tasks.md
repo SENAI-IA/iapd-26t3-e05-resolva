@@ -1,8 +1,10 @@
 # Resolva — plano de implementação
 
-Status: desenvolvimento iniciado. A fundação (tarefas 1 e 3) foi implementada;
-o servidor mínimo da tarefa 9 também está disponível. Evidências e limites em
-[docs/fundacao.md](docs/fundacao.md). As demais tarefas permanecem pendentes.
+Status: desenvolvimento iniciado. A fundação, configuração e schema (tarefas 1–4)
+foram implementados; o servidor mínimo da tarefa 9 também está disponível.
+Evidências e limites em [docs/fundacao.md](docs/fundacao.md) e
+[docs/configuracao-persistencia.md](docs/configuracao-persistencia.md).
+As demais tarefas permanecem pendentes.
 
 As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar testes e evidências correspondentes antes de ser marcada como concluída.
 
@@ -10,11 +12,11 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
 
 - [x] 1. Criar workspace pnpm com `web` e `backend`, TypeScript estrito, Node 22 e scripts de lint, formatação e teste.
   - Requisitos: R25.
-- [ ] 2. Criar configuração de ambiente, `.env.example`, `resolva.config.example.json`, `.gitignore` e validação Zod de limites, caminhos e comandos.
+- [x] 2. Criar configuração de ambiente, `.env.example`, `resolva.config.example.json`, `.gitignore` e validação Zod de limites, caminhos e comandos.
   - Requisitos: R08, R13, R24, R25.
 - [x] 3. Criar Docker Compose do PostgreSQL com volume nomeado, healthcheck e porta local configurável.
   - Requisitos: R01, R23.
-- [ ] 4. Configurar Drizzle, conexão, migrações e schema inicial sem segredos.
+- [x] 4. Configurar Drizzle, conexão, migrações e schema inicial sem segredos.
   - Requisitos: R01, R04, R05, R21, R23, R24.
 
 ## Domínio e backend
@@ -164,7 +166,7 @@ Caminhos nesta tabela são entregáveis futuros. Requisitos completos continuam 
 | 1 | Felipe | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, pacotes e lockfile | Tipos/scripts resolvem sem `any` |
 | 2 | Sergio | `config/resolva.config.example.json`, `backend/src/config/{project,environment}.ts`, `.env.example` | `..`, symlink externo, comando livre e limites inválidos recusados |
 | 3 | Felipe | `docker-compose.yml` | Config válido, healthcheck/volume/bind local |
-| 4 | Felipe | `backend/src/db/{index,schema,migrate}.ts`, `backend/drizzle/0000_init.sql` | Seis tabelas/FKs/índices em banco descartável |
+| 4 | Felipe | `backend/src/db/{index,schema,migrate}.ts`, `backend/drizzle/0000_init.sql` | Sete tabelas, incluindo triagens, FKs e índices em banco descartável |
 | 5 | Felipe | `backend/src/domain/{ticket,contracts}.ts` | Limites, estados e confirmações humanas |
 | 6 | Felipe/Sergio | `backend/src/repository/{ticket,execution,delivery}Repository.ts` | Rollback atômico; versão; snapshot imutável; unicidades |
 | 7 | Felipe | `backend/src/services/ticketService.ts`, `backend/src/trpc/routers/tickets.ts` | Busca literal, paginação, erros e complementação |
@@ -199,7 +201,7 @@ Todos os passos abaixo são futuros. Testes de cada componente pertencem à mesm
 
 #### E1 — fundação e tickets (1, 3–7, 9, 26)
 
-- [ ] Escrever `backend/src/db/schema.integration.test.ts`: seis tabelas, FKs, requestKey única e índice de uma execução; reconexão mantém registros.
+- [x] Escrever `backend/src/db/schema.integration.test.ts`: sete tabelas (contrato v2), FKs, requestKey única e índice de uma execução; reconexão mantém registros.
 - [ ] Escrever `backend/src/domain/ticket.test.ts` e `backend/src/trpc/tickets.test.ts`: limites exatos e um caractere fora, categoria desconhecida, estado inválido, R19 do requirements, resposta sem execução e `NOT_FOUND`.
 - [ ] Escrever `backend/src/repository/ticketRepository.integration.test.ts`: duas edições versão 1 com um sucesso/um conflito, rollback e busca literal `%`/`_`/barra.
 - [ ] Observar falhas, implementar os contratos/arquivos da tabela e ligar servidor/routers sem efeitos colaterais no import.

@@ -1,0 +1,35 @@
+{
+  "repository": "sua-equipe/seu-alvo",
+  "baseBranch": "main",
+  "repositoryRoot": "targets/demo-target",
+  "allowedPaths": ["src", "tests"],
+  "testPaths": ["tests"],
+  "documentationPaths": ["docs"],
+  "preparationCommands": [],
+  "validationCommands": [
+    {
+      "id": "suite",
+      "executable": "pnpm",
+      "args": ["exec", "vitest", "run", "--reporter=json", "--outputFile={reportPath}"],
+      "cwd": ".",
+      "kind": "test"
+    }
+  ],
+  "regressionCommand": {
+    "id": "regressao",
+    "executable": "pnpm",
+    "args": ["exec", "vitest", "run", "--reporter=json", "--outputFile={reportPath}"],
+    "cwd": ".",
+    "kind": "test"
+  },
+  "testAdapter": "vitest-json",
+  "kiroModel": "substitua-pelo-modelo-disponivel-na-sua-conta",
+  "maxRounds": 3,
+  "runTimeoutSeconds": 1800,
+  "commandTimeoutSeconds": 300,
+  "kiroTimeoutSeconds": 300,
+  "maxChangedFiles": 20,
+  "maxChangedLines": 1000,
+  "workspaceRoot": ".resolva/workspaces",
+  "artifactRoot": ".resolva/artifacts"
+}

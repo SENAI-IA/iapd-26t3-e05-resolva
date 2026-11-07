@@ -20,3 +20,4 @@ artifacts/
 
 # Configuração local do projeto-alvo.
 resolva.config.json
+targets/

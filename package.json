@@ -1,0 +1,29 @@
+{
+  "name": "resolva",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter backend --filter web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "oxlint --deny-warnings --deny explicit-any backend web",
+    "format": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore .",
+    "format:check": "oxfmt --check --ignore-path .gitignore --ignore-path .oxfmtignore .",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.0.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23",
+    "pnpm": ">=10 <11"
+  },
+  "packageManager": "pnpm@10.28.2"
+}

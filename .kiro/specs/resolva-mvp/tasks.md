@@ -1,16 +1,18 @@
 # Resolva — plano de implementação
 
-Status inicial: planejamento. Nenhuma tarefa foi executada.
+Status: desenvolvimento iniciado. A fundação (tarefas 1 e 3) foi implementada;
+o servidor mínimo da tarefa 9 também está disponível. Evidências e limites em
+[docs/fundacao.md](docs/fundacao.md). As demais tarefas permanecem pendentes.
 
 As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar testes e evidências correspondentes antes de ser marcada como concluída.
 
 ## Fundação
 
-- [ ] 1. Criar workspace pnpm com `web` e `backend`, TypeScript estrito, Node 22 e scripts de lint, formatação e teste.
+- [x] 1. Criar workspace pnpm com `web` e `backend`, TypeScript estrito, Node 22 e scripts de lint, formatação e teste.
   - Requisitos: R25.
 - [ ] 2. Criar configuração de ambiente, `.env.example`, `resolva.config.example.json`, `.gitignore` e validação Zod de limites, caminhos e comandos.
   - Requisitos: R08, R13, R24, R25.
-- [ ] 3. Criar Docker Compose do PostgreSQL com volume nomeado, healthcheck e porta local configurável.
+- [x] 3. Criar Docker Compose do PostgreSQL com volume nomeado, healthcheck e porta local configurável.
   - Requisitos: R01, R23.
 - [ ] 4. Configurar Drizzle, conexão, migrações e schema inicial sem segredos.
   - Requisitos: R01, R04, R05, R21, R23, R24.
@@ -26,6 +28,7 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
 - [ ] 8. Implementar procedures tRPC de triagem, fila, implementação e ambiente, incluindo idempotência por `requestKey` e validação de elegibilidade.
   - Requisitos: R05, R06, R07, R08, R21, R23, R28, R29, R30, R32.
 - [ ] 9. Implementar healthcheck, erros públicos de triagem/implementação e validações de ambiente sem stack trace ou segredos.
+  - Parcial: servidor local, `GET /rest/health`, bloqueio Host/Origin e erros HTTP públicos implementados; erros de domínio e validações das integrações pendentes.
   - Requisitos: R08, R21, R24, R29, R30, R32.
 
 ## Executor controlado
@@ -247,7 +250,7 @@ Gate 0 pode ocorrer em paralelo à fundação. E1 e E2 estabilizam tipos/infraes
 
 Foco de revisão: replay de chave com versão alterada; confirmação de PR após resposta perdida; relatório legítimo sem dados de teste quando há pergunta; compilação diferente de asserção; processos órfãos/perda de lock; consulta final de todos os eventos. Cada classe tem caso explícito acima.
 
-Nenhuma tarefa está concluída nesta fase. Integração real exige repositório alvo separado, modelo/credencial Kiro e credencial GitHub. A ausência desses itens é pendência explícita, sem impedir testes locais com fakes. Depois da revisão deste pacote, a implementação pode seguir estas entregas; este pedido documental não inicia execução paga ou correção de sistemas externos.
+A proposta original não executou tarefas; o estado atual está no início deste documento e em `docs/fundacao.md`. Integração real exige repositório alvo separado, modelo/credencial Kiro e credencial GitHub. A ausência desses itens é pendência explícita, sem impedir testes locais com fakes. Depois da revisão deste pacote, a implementação pode seguir estas entregas; este pedido documental não inicia execução paga ou correção de sistemas externos.
 
 ### Contratos adicionais de triagem
 

@@ -12,7 +12,7 @@ O público inicial são equipes de engenharia que precisam acelerar correções 
 
 ## Estado do projeto
 
-**MVP em planejamento e validação de produto.** A arquitetura, os contratos e os critérios de aceite estão definidos; a implementação e a validação ponta a ponta ainda serão executadas.
+**Desenvolvimento iniciado.** A fundação inclui workspace pnpm, entrada React/Vite, API local Fastify com healthcheck e PostgreSQL via Docker Compose. Cadastro de tickets, persistência, triagem, executor e integração GitHub permanecem em implementação futura. O fluxo ponta a ponta ainda não está disponível.
 
 ## Fluxo previsto
 
@@ -40,9 +40,35 @@ O frontend seguirá uma identidade visual própria, adaptada ao domínio do Reso
 
 ## Como executar
 
-A aplicação está em planejamento; os comandos de instalação, migração e execução serão adicionados com a implementação.
+Pré-requisitos desta entrega: **Node.js 22 (mínimo 22.12)**, **pnpm 10.28.2** e **Docker com Compose** para iniciar o PostgreSQL. O mínimo de Node acompanha a [compatibilidade do Vite](https://vite.dev/guide/).
 
-O ambiente previsto utiliza **Node.js 22**, **pnpm 10**, **Docker com Compose** e **Kiro CLI autenticado para execução headless**. Frontend, backend e Kiro rodarão no host; o PostgreSQL ficará no Docker. A operação completa exige um repositório-alvo controlado e acesso ao GitHub para publicar branches e abrir Pull Requests.
+```bash
+nvm use
+corepack enable
+corepack prepare pnpm@10.28.2 --activate
+pnpm install --frozen-lockfile
+cp .env.example .env
+# Edite .env e escolha uma senha local antes de iniciar o banco.
+pnpm db:up
+pnpm dev
+```
+
+A interface abre em `http://127.0.0.1:5173`. A API escuta em `http://127.0.0.1:3000`; `GET /rest/health` devolve `{"status":"ok"}`. O Vite encaminha `/rest` e `/trpc` para a API; ainda não há procedures tRPC. Host e Origin são restritos ao ambiente local, com headers de proxy desabilitados conforme a [configuração do Fastify](https://fastify.dev/docs/latest/Reference/Server/#trustproxy).
+
+O healthcheck confirma somente a disponibilidade HTTP. A interface e a API desta entrega podem rodar sem PostgreSQL, Kiro ou credencial GitHub. O PostgreSQL fica disponível em `127.0.0.1:5433`; altere `POSTGRES_PORT` e o mesmo valor em `DATABASE_URL` no `.env` se necessário. O banco ainda não possui schema nem migrações. Após criar o volume, mudanças de usuário/senha no `.env` não alteram as credenciais já inicializadas pelo PostgreSQL.
+
+Para parar o banco preservando os dados, execute `pnpm db:down`. O volume nomeado é mantido; não use `docker compose down -v` se quiser preservá-lo.
+
+```bash
+pnpm check          # tipos, lint, formatação, testes e build
+pnpm format        # aplica a formatação
+pnpm --filter backend start  # inicia a API compilada após pnpm build
+docker compose --env-file .env.example config --quiet
+```
+
+Os testes atuais verificam a API via injeção HTTP do Fastify, sem IA, rede ou banco. O pacote web ainda não possui testes de comportamento; seu script aceita a ausência de testes enquanto contém apenas a entrada estática. A verificação do Compose valida a configuração, sem iniciar o contêiner.
+
+A operação completa futura exige Kiro CLI autenticado, um repositório-alvo controlado e acesso ao GitHub para publicar branches e abrir Pull Requests. Frontend, backend e Kiro rodam no host; somente o PostgreSQL fica no Docker.
 
 Credenciais devem ser configuradas localmente e não devem ser versionadas.
 

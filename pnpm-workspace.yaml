@@ -1,0 +1,7 @@
+packages:
+  - web
+  - backend
+
+strictPeerDependencies: true
+onlyBuiltDependencies:
+  - esbuild

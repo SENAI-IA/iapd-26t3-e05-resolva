@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #f5f5ef;
+  --color-ink: #182c28;
+  --color-muted: #4e625d;
+  --color-line: #d4dcd3;
+  --color-surface: #ffffff;
+  --font-sans: "Segoe UI", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+}

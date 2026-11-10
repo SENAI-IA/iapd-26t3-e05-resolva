@@ -14,6 +14,18 @@ afterEach(async () => {
 });
 
 describe("API local", () => {
+  it("informa a pré-condição de banco ao consultar triagens", async () => {
+    const response = await setup().inject({
+      method: "GET",
+      url: "/trpc/triages.list",
+      headers: { host: "localhost:3000" },
+    });
+    expect(response.statusCode).toBe(412);
+    expect(response.json()).toMatchObject({
+      error: { data: { code: "PRECONDITION_FAILED" } },
+    });
+  });
+
   it("sanitiza erros de URL antes do roteamento", async () => {
     const response = await setup().inject({
       method: "GET",

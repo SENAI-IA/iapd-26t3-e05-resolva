@@ -12,7 +12,7 @@ O público inicial são equipes de engenharia que precisam acelerar correções 
 
 ## Estado do projeto
 
-**Desenvolvimento iniciado.** A fundação inclui workspace pnpm, entrada React/Vite, API local Fastify, configuração validada com Zod e schema PostgreSQL/Drizzle com migrações. Cadastro de tickets, repositories, triagem, executor e integração GitHub permanecem em implementação futura. O fluxo ponta a ponta ainda não está disponível.
+**Tickets e conclusões de triagem persistidos no PostgreSQL e consultáveis por API.** O backend mantém histórico e controle de versão dos tickets, com ações de complementação, contestação, resolução e reabertura. A triagem classifica evidências estruturadas e mantém as conclusões anteriores. A execução real da triagem depende da integração com o Kiro. Interface, fila de implementação e integração GitHub permanecem pendentes.
 
 ## Fluxo previsto
 
@@ -54,9 +54,9 @@ pnpm db:migrate
 pnpm dev
 ```
 
-A interface abre em `http://127.0.0.1:5173`. A API escuta em `http://127.0.0.1:3000`; `GET /rest/health` devolve `{"status":"ok"}`. O Vite encaminha `/rest` e `/trpc` para a API; ainda não há procedures tRPC. Host e Origin são restritos ao ambiente local, com headers de proxy desabilitados conforme a [configuração do Fastify](https://fastify.dev/docs/latest/Reference/Server/#trustproxy).
+A interface abre em `http://127.0.0.1:5173`. A API escuta em `http://127.0.0.1:3000`; `GET /rest/health` devolve `{"status":"ok"}`. O Vite encaminha `/rest` e `/trpc` para a API. Host e Origin são restritos ao ambiente local, com headers de proxy desabilitados conforme a [configuração do Fastify](https://fastify.dev/docs/latest/Reference/Server/#trustproxy).
 
-O healthcheck confirma somente a disponibilidade HTTP. A interface e a API desta entrega podem rodar sem PostgreSQL, Kiro ou credencial GitHub. O PostgreSQL fica disponível em `127.0.0.1:5433`; altere `POSTGRES_PORT` e o mesmo valor em `DATABASE_URL` no `.env` se necessário. Após criar o volume, mudanças de usuário/senha no `.env` não alteram as credenciais já inicializadas pelo PostgreSQL.
+O healthcheck confirma somente a disponibilidade HTTP. A interface e o healthcheck podem rodar sem PostgreSQL, Kiro ou credencial GitHub. Para usar tickets, configure `DATABASE_URL`, inicie o banco e aplique as migrações. Sem `DATABASE_URL`, as procedures retornam `PRECONDITION_FAILED`; falhas de conexão retornam erro público, sem detalhes internos. Os scripts de desenvolvimento e execução leem o `.env` da raiz. O PostgreSQL fica disponível em `127.0.0.1:5433`; altere `POSTGRES_PORT` e o mesmo valor em `DATABASE_URL` no `.env` se necessário. Após criar o volume, mudanças de usuário/senha no `.env` não alteram as credenciais já inicializadas pelo PostgreSQL.
 
 `pnpm db:migrate` lê o `.env` da raiz e aplica as migrações versionadas, sem executá-las automaticamente ao iniciar a API. O schema inclui tickets, triagens, histórico, execuções, entregas e artefatos. Importar os módulos de banco não abre conexões. Para gerar outra migração após alterar `backend/src/db/schema.ts`, use `pnpm db:generate` e revise o SQL gerado antes de aplicar. Esse fluxo usa [geração e aplicação explícitas de migrações Drizzle](https://orm.drizzle.team/docs/migrations).
 
@@ -70,7 +70,37 @@ pnpm --filter backend start  # inicia a API compilada após pnpm build
 docker compose --env-file .env.example config --quiet
 ```
 
-Os testes unitários verificam a API via injeção HTTP e os validadores de configuração, sem IA nem banco. Os testes de integração usam [PostgreSQL via Testcontainers](https://github.com/testcontainers/testcontainers-node/blob/main/docs/modules/postgresql.md), com porta aleatória e recursos descartáveis; não leem `DATABASE_URL` do operador nem usam o volume da demonstração. O primeiro uso pode baixar imagens Docker. O pacote web ainda não possui testes de comportamento; seu script aceita a ausência de testes enquanto contém apenas a entrada estática. A verificação do Compose valida a configuração, sem iniciar o contêiner.
+Os testes unitários verificam o servidor HTTP, os contratos de campos, as transições humanas, as cinco classificações de triagem, a validade por versão/hashes, a elegibilidade de bugs e melhorias e os validadores de configuração, sem IA nem banco. Os testes de integração usam [PostgreSQL via Testcontainers](https://github.com/testcontainers/testcontainers-node/blob/main/docs/modules/postgresql.md), com porta aleatória e recursos descartáveis; não leem `DATABASE_URL` do operador nem usam o volume da demonstração. Cobrem concorrência, rollback, busca literal, invalidação de triagem e as rotas tRPC por HTTP. O primeiro uso pode baixar imagens Docker. O pacote web ainda não possui testes de comportamento; seu script aceita a ausência de testes enquanto contém apenas a entrada estática. A verificação do Compose valida a configuração, sem iniciar o contêiner.
+
+## API de tickets
+
+As procedures disponíveis em `/trpc` são `tickets.create`, `list`, `byId`, `update`, `events`, `provideInformation`, `contestTriage`, `resolve` e `reopen`. Consultas usam GET e mutações usam POST. Nenhuma dessas ações chama IA, abre PR ou altera status arbitrariamente.
+
+Com o banco migrado e a API iniciada, é possível cadastrar e listar:
+
+```bash
+curl -sS http://127.0.0.1:3000/trpc/tickets.create \
+  -H 'Content-Type: application/json' \
+  --data '{"title":"Quantidade incorreta","description":"O total ignora a quantidade informada.","expectedBehavior":"Multiplicar o preço pela quantidade.","category":"calculo"}'
+
+curl -sS http://127.0.0.1:3000/trpc/tickets.list
+```
+
+A criação devolve ID, código `RES-001`, estado `aberto` e versão 1 em `result.data`. Cada mutação de ticket existente exige `ticketId` e `expectedVersion`; respostas `CONFLICT` exigem atualizar os dados antes de repetir a decisão. A edição é permitida em `aberto` ou `aguardando_informacoes`; mudanças relevantes invalidam a triagem anterior sem apagar sua conclusão.
+
+Listas aceitam `page`, `pageSize` (máximo 50), `q`, `status` e `category`. A busca trata `%`, `_` e barra literalmente. `byId` devolve ticket e resumos de execução/entrega; `events` devolve histórico paginado. Datas são ISO UTC, e snapshots internos não são enviados nesses resumos.
+
+Complementação exige `aguardando_informacoes` e contestação exige recusa com triagem vinculada. Resolver exige `aguardando_revisao`, `mergeConfirmed: true` e `testVerified: true`. Reabrir exige justificativa em `message`. O estado de revisão e os ajustes de PR dependem do fluxo de implementação.
+
+## Regras de triagem
+
+O domínio classifica evidências estruturadas e confere a versão do ticket e os hashes das fontes. Bugs precisam de plano de regressão. Melhorias precisam de escopo, critérios e plano de testes. A decisão permanece separada do início manual. [Regras de domínio da triagem](.kiro/specs/resolva-mvp/docs/triagem-dominio.md).
+
+`triages.byId({ triageId })` consulta a conclusão e `triages.list` aceita filtros por ticket, classificação e validade, com paginação. `triages.start({ ticketId, expectedVersion, requestKey })` devolve `triageExecutionId` quando há um executor ligado. Repetir a chave da mesma intenção recupera a execução original, inclusive após mudanças no ticket. A configuração padrão devolve `PRECONDITION_FAILED` para novos inícios enquanto o supervisor e o ensaio autenticado do Kiro estão pendentes.
+
+Cada reserva grava o snapshot da versão analisada, incluindo complementos e contestações ligados à conclusão original. Um conflito de concorrência informa `activeExecutionId` quando há outra execução ativa. A conclusão registra mensagem, fontes, hashes e critérios, e atualiza a triagem vigente na mesma transação. Se a análise falhar tecnicamente, o ticket volta a `aberto` e mantém o histórico. Os testes de integração usam um executor falso para verificar esse fluxo via HTTP e PostgreSQL.
+
+O adaptador de triagem prepara um workspace descartável, gera o perfil Kiro V3 para as fontes selecionadas e valida o relatório antes da persistência. A integração HTTP usa um processo simulado em testes. [Compatibilidade e ensaio do Kiro](.kiro/specs/resolva-mvp/docs/kiro-compatibility.md).
 
 ## Configuração do projeto-alvo
 
@@ -78,7 +108,7 @@ A configuração de IA é opcional nesta fase. Copie `config/resolva.config.exam
 
 Os caminhos são relativos ao arquivo de configuração. `allowedPaths`, `testPaths` e `documentationPaths` são diretórios dentro do alvo, sem caminhos absolutos, `..` ou globs. Testes devem ficar sob os diretórios permitidos inclusive após resolver symlinks; metadados Git, credenciais e configurações de agentes não são caminhos de escrita válidos. Workspaces e artefatos ficam fora do alvo, sem sobreposição. O carregamento verifica symlinks e os comandos devem ser objetos com executável, argumentos e `cwd`, sem strings de shell. `{reportPath}` é reservado ao backend para gerar o caminho dos relatórios de teste.
 
-`parseProjectConfig` valida a estrutura e os limites; `loadProjectConfig` acrescenta as verificações no sistema de arquivos. O carregamento não executa comandos. A existência da branch e a revalidação imediatamente antes dos efeitos serão responsabilidade do adaptador Git e do executor nas próximas entregas. A API atual ainda não inicia execuções nem utiliza esse arquivo automaticamente.
+`parseProjectConfig` valida a estrutura e os limites; `loadProjectConfig` acrescenta as verificações no sistema de arquivos. O carregamento não executa comandos. A existência da branch e a revalidação imediatamente antes dos efeitos serão responsabilidade do adaptador Git e do executor nas próximas entregas. Na inicialização, a API utiliza as categorias do arquivo estruturalmente válido; arquivo ausente ou inválido utiliza as categorias padrão com aviso para arquivo inválido. A ausência do checkout ou das credenciais de IA não impede CRUD. Reinicie a API após alterar o catálogo. As demais opções ainda não iniciam execuções.
 
 A operação completa futura exige Kiro CLI autenticado, um repositório-alvo controlado e acesso ao GitHub para publicar branches e abrir Pull Requests. Frontend, backend e Kiro rodam no host; somente o PostgreSQL fica no Docker.
 

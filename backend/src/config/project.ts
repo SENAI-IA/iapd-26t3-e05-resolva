@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { ConfigurationError } from "./error.js";
 import { hasControlCharacters } from "./strings.js";
+import { defaultCategories } from "../domain/contracts.js";
 
 const relativePath = z
   .string()
@@ -94,6 +96,11 @@ function validBranch(value: string) {
   );
 }
 
+export const targetSystemKeySchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
+
+const targetSystemDisplayNameSchema = z.string().trim().min(1).max(100);
+const targetSystemVersionSchema = z.number().int().positive().max(2147483647);
+
 function containsPath(root: string, path: string) {
   const difference = relative(root, path);
   return (
@@ -104,6 +111,10 @@ function containsPath(root: string, path: string) {
 
 export const projectConfigSchema = z
   .strictObject({
+    targetSystemKey: targetSystemKeySchema,
+    displayName: targetSystemDisplayNameSchema,
+    version: targetSystemVersionSchema.default(1),
+    pipelineRef: z.string().min(1).max(255).refine(validBranch),
     repository: z
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u)
@@ -113,15 +124,7 @@ export const projectConfigSchema = z
     allowedPaths: z.array(writablePath).min(1).max(100),
     testPaths: z.array(writablePath).min(1).max(100),
     documentationPaths: z.array(relativePath).min(1).max(100),
-    categories: z
-      .array(categorySchema)
-      .min(1)
-      .max(100)
-      .default([
-        { slug: "validacao_entrada", label: "Validação de entrada" },
-        { slug: "regra_negocio", label: "Regra de negócio" },
-        { slug: "calculo", label: "Cálculo" },
-      ]),
+    categories: z.array(categorySchema).min(1).max(100).default(defaultCategories),
     preparationCommands: z.array(commandSchema).max(20),
     validationCommands: z.array(configuredCommandSchema).min(1).max(20),
     regressionCommand: commandSchema.extend({ kind: z.literal("test") }),
@@ -167,11 +170,18 @@ export const projectConfigSchema = z
   });
 
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;
+export type TargetSystemConfig = ProjectConfig;
+export type TargetSystemConfigSnapshot = ProjectConfig & { snapshotHash: string };
 
 export function parseProjectConfig(value: unknown): ProjectConfig {
   const result = projectConfigSchema.safeParse(value);
   if (!result.success) throw new ConfigurationError("Configuração do projeto inválida.");
   return result.data;
+}
+
+export function createTargetSystemSnapshot(config: TargetSystemConfig): TargetSystemConfigSnapshot {
+  const snapshotHash = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+  return { ...config, snapshotHash };
 }
 
 function resolvedPath(path: string): string {

@@ -2,9 +2,9 @@
 
 ## Objetivo e limites
 
-O sistema terá um frontend próprio, um backend local e PostgreSQL em Docker. O backend coordena tickets, triagens, fila de implementação, execuções e evidências. O Kiro CLI é um subprocesso controlado: a triagem consulta contexto sem alterar código; a implementação iniciada pelo usuário pode editar uma cópia do projeto-alvo.
+O sistema terá um frontend próprio, um backend local e PostgreSQL em Docker. O backend coordena tickets, a configuração do sistema-alvo, triagens, execuções e evidências. Cada ticket seleciona a configuração validada do sistema-alvo. Após o início manual, o backend dispara uma pipeline CI; a pipeline executa o Kiro CLI em modo headless, valida a alteração e abre uma Merge Request.
 
-A primeira demonstração usa `examples/demo-target`, um bug conhecido de cálculo em centavos e um teste de regressão executável. O projeto alvo deve ficar separado da aplicação Resolva.
+A primeira demonstração usa a configuração que aponta para `examples/demo-target`, um bug conhecido de cálculo em centavos e um teste de regressão executável. O projeto alvo deve permanecer separado da aplicação Resolva.
 
 ## Arquitetura
 
@@ -12,9 +12,11 @@ A primeira demonstração usa `examples/demo-target`, um bug conhecido de cálcu
 flowchart TD
   W["Interface React/tRPC"] --> B["Backend: domínio e executor"]
   B --> D["PostgreSQL/Drizzle"]
-  B --> K["Kiro: triagem somente leitura e implementação controlada"]
-  B --> V["Supervisor: testes e validação"]
-  B --> G["Git/GitHub: branch e PR"]
+  B --> P["Configuração do sistema-alvo do ticket"]
+  B --> C["Pipeline CI de correção"]
+  C --> K["Kiro CLI headless"]
+  C --> G["GitLab: branch e Merge Request"]
+  K --> C
 ```
 
 Organização prevista:
@@ -27,9 +29,10 @@ backend/src/
   repository/         transações e consultas
   services/           tickets e coordenação
   trpc/routers/       tickets, execuções e ambiente
-  executor/           fases, limites, processos e evidências
-  integrations/kiro/  subprocesso, prompts, relatórios e eventos
-  integrations/github/branch, commit, PR e reconciliação
+  executor/           fases, limites, chamadas de pipeline e evidências
+  integrations/ci/    disparo, callback, relatórios e reconciliação da pipeline
+  integrations/kiro/  prompts, relatórios e eventos do Kiro
+  integrations/gitlab/ branch, commit, Merge Request e reconciliação
 web/src/
   components/         layout e componentes reutilizáveis
   routes/              tickets, execuções e configuração
@@ -54,15 +57,18 @@ Etapas de implementação: `preparando_ambiente`, `reproduzindo_problema`, `impl
 
 Tabelas:
 
-- `tickets`: relato, comportamento esperado, categoria, status, versão otimista, classificação vigente e datas.
-- `triages`: execução, versão do ticket, snapshot do relato, classificação, justificativa, comportamento observado, regra esperada, fontes, incertezas, próxima ação, hashes de contexto e validade.
+- `config/resolva.config.json`: configuração única do sistema-alvo, sem credenciais no arquivo versionado.
+- `tickets`: relato, comportamento esperado, categoria, `targetSystemKey`, snapshot/version da configuração selecionada, status, versão otimista, classificação vigente e datas.
+- `triages`: execução, versão do ticket, snapshot do relato e da configuração, classificação, justificativa, comportamento observado, regra esperada, fontes, incertezas, próxima ação, hashes de contexto e validade.
 - `ticket_events`: histórico imutável de estados, triagens, mensagens, complementações, contestações e decisões de implementação.
-- `deliveries`: agrupamento da implementação, branch, SHAs e PR.
-- `executions`: tipo `triage|implementation`, snapshots sem segredo, estado, diagnóstico, rodada, SHAs e versão do Kiro.
+- `deliveries`: agrupamento da implementação, branch, SHA e Merge Request.
+- `executions`: tipo `triage|implementation`, pipeline, snapshots sem segredo, estado, diagnóstico, rodada, SHAs e versão do Kiro.
 - `execution_events`: eventos públicos ordenados por sequência.
 - `artifacts`: referências a logs filtrados, diffs e resultados de testes.
 
 Usar UUID para entidades internas, número inteiro para ticket e identificador visual `RES-001`. Usar `timestamptz` no banco e ISO 8601 UTC na API. Não excluir tickets nem históricos. Usar transação e índice único parcial para garantir uma execução ativa globalmente.
+
+O ticket armazena a chave da configuração e um snapshot imutável da versão usada pela triagem e pela implementação. Alterar a configuração não reescreve tickets existentes; tickets com snapshot incompatível ficam inelegíveis até nova triagem. O usuário escolhe a configuração disponível, mas não fornece comandos, caminhos, credenciais ou modelo em texto livre.
 
 ## Contratos de API
 
@@ -81,51 +87,53 @@ Erros públicos: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `PRECONDITION_FAILED` e
 
 ## Configuração segura
 
-O arquivo `resolva.config.json` fica ignorado pelo Git. Versionar apenas `config/resolva.config.example.json`. Validar com Zod:
+O arquivo `resolva.config.json` fica ignorado pelo Git. Versionar apenas `config/resolva.config.example.json`. O MVP mantém uma única configuração de sistema-alvo por instalação; o ticket seleciona essa configuração por uma chave validada.
 
-- repositório e branch base;
+A configuração valida com Zod:
+
+- identificador do sistema e nome exibido;
+- projeto, repositório GitLab, branch base e referência da pipeline;
 - `allowedPaths`, `testPaths` e `documentationPaths` relativos à raiz;
-- categorias;
-- comandos de preparação e validação como executável, argumentos e `cwd`;
-- adaptador de testes e caminho de relatório;
-- modelo explícito do Kiro;
-- limites de rodadas, tempo e tamanho do diff.
+- comandos de preparação e validação fixados pelo operador;
+- adaptador de testes e modelo Kiro;
+- limites de rodadas, tempo e tamanho do diff;
+- URL e autenticação necessárias para disparar a pipeline, mantidas fora do snapshot.
 
-Recusar caminhos absolutos, `..`, symlinks que escapem da raiz, glob global e comandos derivados do ticket. Variáveis previstas: `DATABASE_URL`, `POSTGRES_*`, `KIRO_API_KEY`, `GH_TOKEN` e `RESOLVA_CONFIG_PATH`. Segredos não entram em snapshots, ambiente completo, logs, prompts, navegador ou Kiro.
+Recusar caminhos absolutos, `..`, symlinks que escapem da raiz, glob global e comandos derivados do ticket. O ticket não fornece comandos, caminhos, credenciais ou modelo em texto livre. A execução recebe apenas um snapshot operacional sem segredos.
+
+O backend valida a configuração antes de reservar a implementação e registra `pipelineId`/URL após o disparo. A pipeline revalida o checkout e os limites antes de alterar o sistema-alvo.
 
 ## Executor e Kiro
 
-O executor é uma rotina em segundo plano com uma execução ativa global. Cada triagem recebe contexto e diretório de artefatos próprios; cada implementação recebe workspace e diretório de artefatos próprios. Os subprocessos usam `spawn`, `shell: false`, argumentos separados, ambiente mínimo, timeout e captura limitada.
+O backend mantém uma execução ativa global, grava a reserva e dispara uma única pipeline CI configurada. A pipeline faz checkout do sistema-alvo, executa os comandos permitidos, invoca o Kiro CLI headless, valida o resultado e cria a Merge Request. O backend não precisa executar o Kiro diretamente no mesmo processo.
 
-A triagem usa um perfil somente leitura. Ela pode consultar fontes autorizadas e executar verificações configuradas, mas não pode editar código, criar teste, criar branch, fazer commit, fazer push ou abrir PR. A implementação somente começa após ação manual e validação de elegibilidade.
+A triagem usa contexto somente leitura e não cria branch, commit ou MR. A implementação recebe o snapshot do ticket e da configuração. O backend envia à pipeline apenas dados necessários, sem credenciais ou ambiente completo.
 
-Invocação base:
+A pipeline deve executar o comando headless configurado, equivalente a:
 
 ```text
-kiro-cli chat --v3 --no-interactive --output-format stream-json --agent resolva-worker --model <modelo>
+kiro-cli chat --v3 --no-interactive --output-format stream-json --model <modelo>
 ```
 
-O prompt vai por stdin. O backend captura eventos JSONL, mas só aceita resultado de negócio em relatório JSON reservado por fase. As fases são `triage`, `analysis`, `regression` e `fix`.
+O resultado deve ser um relatório JSON validado, associado ao `executionId`. A pipeline informa ao backend `pipelineId`, status, branch, SHA, MR e motivo de falha por callback. O callback é idempotente; uma consulta de reconciliação pode ser acionada manualmente quando a resposta for perdida.
 
-O relatório de triagem exige `classification`, `summary`, `observedBehavior`, `expectedBehavior`, `diagnosis`, `references`, `sources`, `uncertainties`, `nextAction` e `outcome`. O relatório de implementação exige identidade da execução, escopo, critérios de aceite, referências e dados de teste apropriados ao tipo `bug` ou `melhoria`. Saída textual não comprova sucesso.
-
-Permissões do perfil de triagem: leitura restrita e verificações autorizadas, sem edição, shell, MCP, subagentes, web, Git ou GitHub. Permissões do perfil de implementação: escrita somente nos caminhos da fase, sem tocar testes proibidos, credenciais ou configurações protegidas.
+O relatório da implementação exige identidade da execução, escopo, critérios de aceite, referências e dados de teste apropriados ao tipo `bug` ou `melhoria`. Saída textual do Kiro ou status isolado da pipeline não comprova sucesso.
 
 ## Triagem, elegibilidade e implementação
 
-1. Registrar ticket em `aberto` com versão otimista e histórico.
-2. Reservar uma execução `triage` em transação e capturar snapshot da versão analisada.
-3. Consultar relato, comportamento esperado, regras vigentes, documentação, código e evidências autorizadas.
+1. Registrar ticket em `aberto` com versão otimista, configuração de sistema-alvo selecionada e histórico.
+2. Reservar uma execução `triage` em transação e capturar snapshot da versão analisada, incluindo a configuração selecionada.
+3. Consultar relato, comportamento esperado, regras vigentes, documentação, código e evidências autorizadas dentro dos limites configurados.
 4. Avaliar as evidências sem presumir que ausência de reprodução seja falso positivo.
 5. Produzir relatório estruturado com uma das cinco classificações, justificativa, comportamento observado, regra esperada, fontes, incertezas e próxima ação.
 6. Persistir mensagem completa no ticket e alterar o estado para `recusado`, `aguardando_informacoes` ou `aguardando_implementacao` conforme a conclusão.
-7. Para `bug` ou `melhoria`, manter item na fila persistida. Nenhum worker pode iniciar implementação automaticamente.
-8. No início manual, conferir classificação, triagem válida para a versão atual, critérios, configuração, chave idempotente e exclusividade global.
-9. Criar snapshot da triagem e iniciar o fluxo de implementação. Para `bug`, exigir teste novo falhando; para `melhoria`, exigir escopo e critérios de aceite com teste do comportamento novo.
-10. Validar caminhos, arquivos sensíveis, limites do diff e SHA; publicar somente após árvore limpa e evidências coerentes.
-11. Reconciliar branch/PR antes de repetir publicação e manter merge, deploy e produção sob responsabilidade humana.
+7. Para `bug` ou `melhoria`, manter item na fila persistida. Nenhum worker inicia implementação automaticamente.
+8. No início manual, conferir classificação, triagem válida, versão da configuração, critérios, chave idempotente e exclusividade global.
+9. Criar snapshot da triagem e disparar a pipeline CI. Para `bug`, exigir teste novo falhando; para `melhoria`, exigir escopo e critérios de aceite com teste do comportamento novo.
+10. Receber callback, validar a identidade da execução e associar a Merge Request somente após SHA e evidências aprovados.
+11. Reconciliar a pipeline ou a MR em caso de resposta perdida, sem disparar uma segunda execução.
 
-Uma alteração relevante no relato, comportamento esperado, regra ou fontes invalida `triageVersion` e bloqueia `implementations.start`. Contestação, complementação ou nova triagem nunca substitui a mensagem anterior no histórico.
+Uma alteração relevante no relato, comportamento esperado, regra, fontes ou configuração do sistema-alvo invalida `triageVersion` e bloqueia `implementations.start`. Contestação, complementação ou nova triagem nunca substitui a mensagem anterior no histórico.
 
 ## Validação e publicação
 
@@ -161,15 +169,16 @@ A interface mostra relato, próxima ação, classificação, justificativa, font
 
 - Uma triagem somente leitura antes de qualquer alteração.
 - Fila persistida com início exclusivamente manual.
+- Uma configuração de sistema-alvo por instalação.
 - Uma execução ativa global no MVP.
-- Kiro CLI headless em vez de agente próprio.
-- GitHub real para branch e PR, com merge humano.
+- Pipeline CI como limite entre o backend e o Kiro headless.
+- GitLab Merge Request com merge humano.
 - Sem autenticação de usuário no MVP local.
 - Sem armazenamento de raciocínio interno do modelo.
 
 ## Detalhamento para implementação — proposta v1
 
-Esta seção complementa o design atual, mantendo R01–R32 e as tarefas originais, com a extensão de triagem e fila. Valores operacionais adicionais são propostas de implementação para revisão da equipe. Fonte de produto: [PRD](PRD.md). A documentação não comprova implementação nem ensaio autenticado.
+Esta seção complementa o design atual, mantendo R01–R37 e as tarefas originais, com a extensão de triagem, configuração do sistema-alvo e fila. Valores operacionais adicionais são propostas de implementação para revisão da equipe. Fonte de produto: [PRD](PRD.md). A documentação não comprova implementação nem ensaio autenticado.
 
 ### 1. Ambiente e dependências
 
@@ -183,10 +192,10 @@ Validar Host contra endereços/portas locais configurados. Em chamadas de navega
 
 | Tabela | Campos mínimos |
 | --- | --- |
-| `tickets` | `id`, `title`, `description`, `expected_behavior`, `reproduction_steps`, `category`, `status`, `version`, `created_at`, `updated_at`, `resolved_at` |
+| `tickets` | `id`, `title`, `description`, `expected_behavior`, `reproduction_steps`, `category`, `target_system_key`, `target_config_snapshot`, `status`, `version`, `created_at`, `updated_at`, `resolved_at` |
 | `ticket_events` | `id`, `ticket_id`, `type`, `from_status`, `to_status`, `message`, `payload`, `created_at` |
-| `deliveries` | `id`, `ticket_id`, `number`, `first_execution_id`, `repository`, `base_branch`, `branch_name`, `base_sha`, `remote_head_sha`, `pr_number`, `pr_url`, `pr_state`, `created_at`, `updated_at` |
-| `executions` | `id`, `ticket_id`, `delivery_id`, `previous_execution_id`, `reproduction_execution_id`, `request_key`, `mode`, `status`, `stage`, `round`, `ticket_snapshot`, `config_snapshot`, `diagnosis`, `blocker_code`, `blocker_message`, `base_sha`, `validated_sha`, `published_sha`, `kiro_version`, `kiro_engine`, `kiro_model`, `started_at`, `completed_at` |
+| `deliveries` | `id`, `ticket_id`, `number`, `first_execution_id`, `repository`, `base_branch`, `branch_name`, `base_sha`, `remote_head_sha`, `mr_iid`, `mr_url`, `mr_state`, `created_at`, `updated_at` |
+| `executions` | `id`, `ticket_id`, `delivery_id`, `request_key`, `mode`, `status`, `stage`, `round`, `ticket_snapshot`, `config_snapshot`, `pipeline_id`, `pipeline_url`, `diagnosis`, `blocker_code`, `blocker_message`, `base_sha`, `validated_sha`, `published_sha`, `kiro_version`, `kiro_model`, `started_at`, `completed_at` |
 | `execution_events` | `id`, `execution_id`, `sequence`, `type`, `stage`, `message`, `payload`, `created_at` |
 | `artifacts` | `id`, `execution_id`, `kind`, `relative_path`, `content_type`, `size_bytes`, `sha256`, `created_at` |
 
@@ -221,51 +230,51 @@ Não há exclusão nem endpoint de status arbitrário. Não editar relato durant
 
 Contratos Zod estritos. Datas ISO UTC. Listas `{ items, total, page, pageSize }`, página 1 e tamanho 15 por padrão, máximo 50. Tickets ordenados por `updated_at DESC, id DESC`; execuções por início/ID. Paginação estável para conjunto sem mudanças, sem promessa de snapshot entre páginas durante atualizações concorrentes. Busca parametrizada e literal por código/título/descrição, escapando `%`, `_` e barra invertida.
 
-`transitionTicket(current: TicketStatus, action: TicketAction): TicketStatus` fica em `backend/src/domain/ticket.ts`. A união `TicketAction` usa `create`, `edit`, `provide_information`, `start`, `request_information`, `complete`, `fail`, `interrupt`, `request_changes`, `resolve`, `reopen` como campo `type`. `resolve` inclui `mergeConfirmed: boolean` e `testVerified: boolean`; exige ambos verdadeiros e origem aguardando revisão. Outras ações recebem seus dados no serviço; a função pura decide estado e rejeita transição inválida.
+`transitionTicket(current: TicketStatus, action: TicketAction): TicketStatus` fica em `backend/src/domain/ticket.ts`. A união `TicketAction` usa `create`, `edit`, `provide_information`, `start`, `request_information`, `complete`, `fail`, `interrupt`, `request_changes`, `start_implementation`, `resolve`, `reopen` como campo `type`. `resolve` inclui `mergeConfirmed: boolean` e `testVerified: boolean`; exige ambos verdadeiros e origem aguardando revisão. `start_implementation` exige ticket elegível e não substitui a validação transacional do serviço. Outras ações recebem seus dados no serviço; a função pura decide estado e rejeita transição inválida.
 
 | Procedure | Entrada | Saída/efeito |
 | --- | --- | --- |
-| `tickets.create` | Conteúdo do formulário | Ticket criado |
-| `tickets.list` | `page?`, `pageSize?`, `q?`, `status?`, `category?` | Lista paginada |
-| `tickets.byId` | `ticketId` | Ticket, última execução e entrega atual resumida |
-| `tickets.update` | `ticketId`, `expectedVersion`, conteúdo | Ticket atualizado |
+| `tickets.create` | Conteúdo do formulário + `targetSystemKey` | Ticket criado com snapshot da configuração |
+| `tickets.list` | `page?`, `pageSize?`, `q?`, `status?`, `category?`, `targetSystemKey?` | Lista paginada |
+| `tickets.byId` | `ticketId` | Ticket, configuração do sistema, última execução e entrega atual resumida |
+| `tickets.update` | `ticketId`, `expectedVersion`, conteúdo e, quando permitido, `targetSystemKey` | Ticket atualizado; troca de configuração invalida triagem |
 | `tickets.events` | `ticketId`, `page?`, `pageSize?` | Eventos paginados |
 | `tickets.provideInformation` | `ticketId`, `expectedVersion`, `message` | Resposta registrada e ticket aberto |
 | `tickets.requestChanges` | `ticketId`, `expectedVersion`, `kind`, `message` | Observação classificada e ticket aberto |
 | `tickets.resolve` | `ticketId`, `expectedVersion`, `mergeConfirmed: true`, `testVerified: true`, `message?` | Resolução manual; sem executar merge |
 | `tickets.reopen` | `ticketId`, `expectedVersion`, `message` | Reabertura registrada |
-| `executions.start` | `ticketId`, `expectedVersion`, `requestKey` UUID | `{ executionId, ticketId, status }` após commit da reserva |
+| `implementations.queue` | `page?`, `classification?`, `q?` | Tickets elegíveis e motivo de bloqueio quando aplicável |
+| `implementations.start` | `ticketId`, `expectedVersion`, `requestKey` UUID | Reserva e disparo da pipeline usando a configuração do ticket |
+| `implementations.list` | `ticketId?`, `status?`, `page?`, `pageSize?` | Execuções de implementação paginadas |
+| `implementations.byId` | `executionId` | Estado, configuração, triagem, escopo, critérios, testes e MR |
 | `executions.list` | `ticketId?`, `status?`, `page?`, `pageSize?` | Execuções paginadas |
-| `executions.byId` | `executionId` | Estado/etapa, diagnóstico, testes, impedimento e PR |
+| `executions.byId` | `executionId` | Estado/etapa, diagnóstico, testes, impedimento e MR |
 | `executions.events` | `executionId`, `afterSequence?`, `limit?` | `{ items, nextSequence, hasMore }`; padrão 100, máximo 200, crescente |
 | `executions.artifact` | `executionId`, `artifactId` | Texto filtrado até 1 MiB; sem caminho livre |
-| `environment.get` | — | Configuração pública, categorias, limites e execução ativa |
-| `environment.check` | — | Verifica banco/binários/versão/acesso de leitura; não chama modelo nem publica |
+| `environment.get` | — | Configuração pública, limites, pipeline e execução ativa |
+| `environment.check` | — | Verifica banco, configuração, pipeline e acesso; não dispara execução |
 
-`NOT_FOUND` para ID ausente; `BAD_REQUEST` para entrada; `CONFLICT` para estado/versão/concorrência; `PRECONDITION_FAILED` para ambiente incompleto. Falha inesperada retorna mensagem pública e log filtrado. Cada procedure recusa por estado o que a interface também desabilita.
+`NOT_FOUND` para ID ausente; `BAD_REQUEST` para entrada; `CONFLICT` para estado/versão/concorrência; `PRECONDITION_FAILED` para ambiente ou perfil incompleto; `TRIAGE_REQUIRED`, `TRIAGE_OUTDATED`, `IMPLEMENTATION_NOT_ELIGIBLE`, `CRITERIA_REQUIRED`, `ACTIVE_EXECUTION` e `TARGET_PROFILE_INVALID` para bloqueios específicos. Falha inesperada retorna mensagem pública e log filtrado. Cada procedure recusa por estado o que a interface também desabilita.
 
 ### 5. Configuração e limites
 
-`ProjectConfig` é derivado do schema em `backend/src/config/project.ts`. Não ler ambiente durante importação dos contratos. `repository` tem formato `owner/name`, com HTTPS derivado sem credencial na URL; `baseBranch` é configurada, existente e validada por Git.
+`TargetSystemConfig` é derivado do schema em `backend/src/config/project.ts`. Não ler ambiente durante importação dos contratos. A configuração contém repositório GitLab, branch base, referência da pipeline, limites e comandos fixos; `targetSystemKey` é a única referência aceita no ticket.
 
 | Campo | Proposta operacional |
 | --- | --- |
+| `targetSystemKey` | Chave estável selecionada no ticket |
+| `repository` / `baseBranch` | Repositório GitLab e branch base |
+| `pipelineRef` | Referência fixa da pipeline de correção |
 | `allowedPaths` | Diretórios relativos alteráveis; sem glob global |
 | `testPaths` | Subconjunto de allowedPaths para testes de regressão |
 | `documentationPaths` | Fontes locais legíveis; sem download durante execução |
-| `categories` | Slugs/rótulos permitidos |
-| `preparationCommands` | `{ id, executable, args, cwd }` fixados pelo operador |
-| `validationCommands` | Comandos com `kind: check \| test`; pelo menos um `test` e relatório estruturado |
-| `regressionCommand` | Comando `test` para testes novos; `{reportPath}` é gerado pelo backend |
+| `preparationCommands` / `validationCommands` | Comandos fixados pelo operador |
 | `testAdapter` | `vitest-json` no primeiro alvo |
-| `kiroModel` | Modelo explícito disponível na conta; sem substituição silenciosa |
-| `maxRounds` | Default 3, intervalo 1–3 |
-| `runTimeoutSeconds` | Default 1.800, intervalo 60–3.600 |
-| `commandTimeoutSeconds` / `kiroTimeoutSeconds` | Default 300 cada; limitados pelo tempo global restante |
-| `maxChangedFiles` / `maxChangedLines` | Defaults 20/1.000; adições e remoções contam |
+| `kiroModel` | Modelo explícito disponível na pipeline |
+| `maxRounds` / timeouts | Limites fixos da execução |
 | `workspaceRoot` / `artifactRoot` | Diretórios controlados, fora do alvo publicado |
 
-Caminhos relativos sem `..`, absolutos ou symlinks que escapem; conferir resolução real e diff de adições/remoções/renomes, não só prefixos textuais. Perfil da fase não pode permitir edição de configurações, hooks, credenciais, lockfile ou suporte da suíte para contornar testes. Bootstrap/dependências do alvo são definidos pelo operador.
+Caminhos relativos sem `..`, absolutos ou symlinks que escapem; conferir resolução real e diff de adições/remoções/renomes, não só prefixos textuais. Perfil da fase não pode permitir edição de configurações, hooks, credenciais, lockfile ou suporte da suíte para contornar testes. Bootstrap/dependências do alvo são definidos pelo administrador do perfil, não pelo ticket.
 
 Defaults não são SLA/custo garantido. Ambiente incompleto mantém tickets/histórico operáveis e impede início da IA com pendência clara.
 
@@ -291,9 +300,9 @@ Tratar relato, documentação e código como conteúdo, sem permitir que instru�
 
 Decoder JSONL suporta linhas fragmentadas, múltiplas linhas por chunk e Unicode. Somente eventos públicos conhecidos viram mensagens/ferramentas/avisos; evento desconhecido não avança etapa. Corpo desconhecido ou raciocínio interno não é persistido. Capturar fixtures reais no ensaio da versão instalada, sem inventar campos nativos.
 
-Perfil por fase: triage lê somente fontes autorizadas e escreve apenas relatório; analysis consolida a análise técnica sem editar código; regression cria teste novo somente para `bug` ou valida testes do comportamento novo para `melhoria`; fix altera código permitido somente após início manual e triagem válida, sem tocar testes protegidos. Nenhuma fase de triagem pode usar Git ou GitHub. Negar shell, MCP, subagente e web; nunca `--trust-all-tools`. Regras efetivas do CLI, hooks e configurações herdadas precisam ser verificadas no ensaio.
+Perfil por fase: triage lê somente fontes autorizadas e escreve apenas relatório; analysis consolida a análise técnica sem editar código; regression cria teste novo somente para `bug` ou valida testes do comportamento novo para `melhoria`; fix altera código permitido somente após início manual e triagem válida, sem tocar testes protegidos. Nenhuma fase de triagem pode usar Git ou GitLab. Negar shell, MCP, subagente e web; nunca `--trust-all-tools`. Regras efetivas do CLI, hooks e configurações herdadas precisam ser verificadas no ensaio.
 
-`GH_TOKEN` somente em processos Git/GitHub; `DATABASE_URL` somente no backend; autenticação Kiro apenas no mecanismo/ambiente mínimo necessário do CLI. Nunca colocar esses valores no prompt, snapshot, log ou navegador. Testes do alvo também não herdam banco/GitHub/Kiro. Isso esclarece a separação entre autenticar um processo e expor credenciais ao contexto do modelo.
+Credenciais do GitLab e do Kiro existem somente no ambiente protegido da pipeline; `DATABASE_URL` somente no backend. Nunca colocar esses valores no prompt, snapshot, log ou navegador. Testes do alvo não herdam banco, GitLab ou Kiro.
 
 ### 7. Evidência de reprodução e validação
 
@@ -309,33 +318,29 @@ Modos: `initial`, `retry`, `review_behavior`, `review_refinement`. Refinamento s
 
 ### 8. Entrega e recuperação de publicação
 
-Uma entrega representa um PR, com várias execuções possíveis. Criá-la antes dos efeitos externos. Branch: `resolva/res-<id-com-no-minimo-tres-digitos>-<oito-primeiros-caracteres-da-primeira-execucao>`, validada com Git. Marcador do corpo: `<!-- resolva-delivery:<uuid> -->`.
+Uma entrega representa uma Merge Request, com várias execuções possíveis. Criá-la antes do disparo externo. Branch: `resolva/res-<id>-<prefixo-da-execucao>`. Marcador do corpo: `<!-- resolva-delivery:<uuid> -->`.
 
-`initial`/`retry` reutilizam entrega pendente mesmo sem URL persistida. Ajustes reutilizam PR aberto/branch conhecida. PR fechado sem merge bloqueia para decisão humana; integrado exige resolução/reabertura explícitas. Antes de IA ou push em retry, reconciliar checkpoints.
+`initial`/`retry` reutilizam entrega pendente. O backend dispara a pipeline e guarda `pipelineId`/URL. Callback repetido ou resposta perdida é reconciliado consultando a pipeline/MR; não há nova execução automática.
 
-Persistir validated SHA e evidências antes do push. Após publicar branch, registrar checkpoint e consultar PR por repositório/head branch/marcador. Resposta perdida não autoriza nova IA ou PR: recuperar identidade/estado/SHA, conferir evidências e completar vínculo. Se só branch existe e commit tem validação persistida, criar/recuperar PR desse commit. Evidência ausente ou SHA divergente bloqueia.
+Persistir o SHA validado e as evidências antes de confirmar a MR. A MR só é confirmada se repositório, branch base, branch, marcador e SHA corresponderem à entrega. Divergência remota bloqueia e exige decisão humana.
 
-Comparar `remote_head_sha` conhecido antes de atualizar. Sem force push, rebase automático ou sobrescrita de mudança humana. Push normal também deve falhar diante de avanço remoto concorrente. PR só confirma se repositório, base, head branch, marcador e head SHA correspondem à entrega validada. Guardar `pr_number`/URL/estado e published SHA.
+O backend usa a integração HTTP da pipeline com credencial isolada. A pipeline mantém credenciais Git/Kiro, e nenhum token entra no ticket, snapshot, prompt, log ou navegador. Testes usam cliente falso, sem rede e sem MR real.
 
-Git/gh com argumentos separados; corpo de PR em arquivo temporário. URL de clone sem credencial. Autenticação HTTPS por helper fixo do gh, configurado apenas nas chamadas necessárias, nunca por alteração global do operador. Não interpolar relato/comando livre nem registrar token. Testes usam gh falso e repositório bare temporário, sem rede.
+### 9. Exclusividade, callback e retomada
 
-### 9. Processos, travas e retomada
+O backend usa lock local e advisory lock PostgreSQL para manter uma execução ativa global. A chamada de disparo da pipeline possui timeout e credencial isolada. Perda da resposta não libera uma segunda execução: o backend consulta a pipeline/MR antes de repetir qualquer efeito.
 
-Supervisor Node por `fork`/IPC controla cada comando e grupo de descendentes em Linux. Timeout ou perda do pai: TERM, até 5 s, depois KILL, aguardando encerramento. Registrar PID, identidade de início, grupo e execução em `.resolva/processes/`. Nunca sinalizar PID reaproveitado sem confirmar identidade. Se encerramento não puder ser confirmado, impedir novo trabalho/publicação.
-
-Trava local por criação atômica de `.resolva/instance.lock/`, com identidade do dono. Outra instância viva impede inicialização. Advisory lock PostgreSQL em conexão exclusiva, com `pg_backend_pid()` registrado. Verificar a cada segundo e antes de publicar; perda, timeout de 3 s ou mudança de conexão invalida posse, interrompe processos e finaliza backend sem reconexão silenciosa.
-
-Ao iniciar, adquirir posse e confirmar limpeza de supervisores anteriores antes de recuperar execuções; aguardar até 10 s e bloquear operacionalmente se restar processo não confirmado. Só então marcar remanescentes `interrompida` e devolver tickets a aberto em transação. Não reiniciar comandos nem IA automaticamente. Próxima tentativa humana faz reconciliação de entrega antes de trabalho novo.
+Ao iniciar, recuperar execuções sem resposta como `interrompida` somente depois de consultar a pipeline e confirmar que não há trabalho ativo incompatível. Não reiniciar pipeline ou Kiro automaticamente. A próxima tentativa humana faz a reconciliação da entrega.
 
 Artefatos `.resolva/artifacts/<executionId>/`; workspace `.resolva/workspaces/<executionId>/`. Log público até 1 MiB; saída total por comando até 10 MiB; excesso encerra com erro explícito. Hash/tamanho/tipo/caminho relativo no banco; acesso por ID vinculado à execução. Filtrar antes de persistir e antes de expor. Artefato ausente gera indisponibilidade clara, preservando registro histórico. Sem limpeza automática no MVP; operador monitora espaço e faz limpeza manual com aplicação parada, preservando evidências necessárias.
 
-Bloqueios de negócio: `information_required`, `unsupported_scope`, `baseline_failed`, `problem_not_reproduced`, `validation_failed`, `changes_out_of_scope`, `review_required`, `remote_conflict`. Falhas técnicas incluem `kiro_process_failed`, `invalid_agent_report`, `command_timeout`, `github_unavailable`. Todos com próxima ação em português.
+Bloqueios de negócio: `information_required`, `unsupported_scope`, `baseline_failed`, `problem_not_reproduced`, `validation_failed`, `changes_out_of_scope`, `review_required`, `remote_conflict`. Falhas técnicas incluem `kiro_process_failed`, `invalid_agent_report`, `command_timeout`, `ci_unavailable`. Todos com próxima ação em português.
 
 ### 10. Interface e ensaio final
 
 Polling de estado 3 s/eventos 5 s enquanto ativo, cursor de sequência e deduplicação por execução/sequence. Após término, buscar lotes até `hasMore: false`, então suspender. Reabrir página lê estado persistido. Erro de rede aparece com ação atualizar; não exibir spinner infinito nem recriar tentativa automaticamente.
 
-Gerar uma `requestKey` por intenção e preservá-la nas repetições HTTP; nova chave somente em nova intenção explícita. Não exigir configuração completa para cadastrar/consultar. `settings` mostra disponibilidade e limites sem editor de tokens. Link PR só após confirmação do backend; conteúdo do ticket/agente é texto escapado, sem HTML arbitrário.
+Gerar uma `requestKey` por intenção e preservá-la nas repetições HTTP; nova chave somente em nova intenção explícita. Não exigir configuração completa para cadastrar/consultar. `settings` mostra disponibilidade e limites sem editor de tokens. Link da MR só após confirmação do backend; conteúdo do ticket/agente é texto escapado, sem HTML arbitrário.
 
 Conferir teclado, foco, rótulos e layouts 1366×768/390×844. Cada transição humana tem erro/confirmação coerente; tipo de ajuste obrigatório. Resolução atesta ação humana, sem fingir integração automática com merge/deploy.
 
@@ -374,7 +379,7 @@ Toda alteração relevante no ticket incrementa `version`, registra evento e inv
 
 `executions.events` e `executions.artifact` continuam comuns às duas espécies de execução, sempre filtrando o acesso pelo `executionId`. `executions.start` deixa de ser uma entrada pública genérica; compatibilidade interna pode delegar para `implementations.start`, mas nunca ignorar a elegibilidade.
 
-Erros adicionais: `TRIAGE_REQUIRED`, `TRIAGE_OUTDATED`, `IMPLEMENTATION_NOT_ELIGIBLE`, `CRITERIA_REQUIRED`, `ACTIVE_EXECUTION` e `TRIAGE_CLASSIFICATION_INVALID`. Cada erro informa a próxima ação sem expor stack trace, prompt ou segredo.
+Erros adicionais: `TRIAGE_REQUIRED`, `TRIAGE_OUTDATED`, `IMPLEMENTATION_NOT_ELIGIBLE`, `CRITERIA_REQUIRED`, `ACTIVE_EXECUTION`, `TARGET_PROFILE_INVALID`, `TRIAGE_CLASSIFICATION_INVALID` e `KIRO_CLI_UNAVAILABLE`. Cada erro informa a próxima ação sem expor stack trace, prompt ou segredo.
 
 ### Relatórios e prompts
 

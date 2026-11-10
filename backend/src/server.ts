@@ -1,7 +1,13 @@
 import type { IncomingHttpHeaders } from "node:http";
 import Fastify, { type FastifyReply } from "fastify";
+import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
+import { appRouter } from "./trpc/router.js";
+import type { TicketService } from "./services/ticketService.js";
+import type { TriageService } from "./services/triageService.js";
 
-export function createServer() {
+export function createServer(
+  options: { ticketService?: TicketService; triageService?: TriageService } = {},
+) {
   const allowedHosts = new Set([
     "127.0.0.1:3000",
     "localhost:3000",
@@ -57,5 +63,16 @@ export function createServer() {
   });
 
   server.get("/rest/health", async () => ({ status: "ok" as const }));
+  server.addHook("onClose", async () => options.triageService?.drain());
+  server.register(fastifyTRPCPlugin, {
+    prefix: "/trpc",
+    trpcOptions: {
+      router: appRouter,
+      createContext: () => ({
+        tickets: options.ticketService ?? null,
+        triages: options.triageService ?? null,
+      }),
+    },
+  });
   return server;
 }

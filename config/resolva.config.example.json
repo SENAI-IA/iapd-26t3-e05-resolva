@@ -1,4 +1,8 @@
 {
+  "targetSystemKey": "demo",
+  "displayName": "Sistema demo",
+  "version": 1,
+  "pipelineRef": "main",
   "repository": "sua-equipe/seu-alvo",
   "baseBranch": "main",
   "repositoryRoot": "targets/demo-target",

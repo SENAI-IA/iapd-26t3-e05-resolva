@@ -6,28 +6,23 @@ Continuação autorizada do desenvolvimento nas tarefas 2 e 4. Referências:
 ## Plano
 
 - [x] Configuração: testes primeiro de defaults/limites, formato do repositório,
-  comandos estruturados, campos desconhecidos, caminhos e symlinks externos;
-  implementar `parseProjectConfig(value: unknown): ProjectConfig` e
-  `loadProjectConfig(path: string): ProjectConfig` em `backend/src/config/project.ts`.
+      comandos estruturados, campos desconhecidos, caminhos e symlinks externos;
+      implementar `parseTargetSystemConfig(value: unknown): TargetSystemConfig` e
+      `loadTargetSystemConfig(path: string): TargetSystemConfig` em `backend/src/config/project.ts`.
 - [x] Ambiente: `readEnvironment(source: NodeJS.ProcessEnv): Environment` explícito,
-  sem leitura no import; valores secretos e erros de validação não são logs nem
-  configuração pública. Ausência de configuração de IA não impede HTTP local.
+      sem leitura no import; valores secretos e erros de validação não são logs nem
+      configuração pública. Ausência de configuração de IA não impede HTTP local.
 - [x] Banco: testes em PostgreSQL Testcontainers descartável; implementar schema,
-  conexão explícita `createDatabase(url: string)` e migração Drizzle versionada.
-  Verificar FKs, unicidades, rollback, índice de execução ativa, triagem e reconexão.
+      conexão explícita `createDatabase(url: string)` e migração Drizzle versionada.
+      Verificar FKs, unicidades, rollback, índice de execução ativa, triagem e reconexão.
 - [x] Scripts `db:generate`, `db:migrate`, `test:integration`; documentação,
-  verificações completas e revisão independente antes do commit local.
+      verificações completas e revisão independente antes do commit local.
 
 ## Contratos e decisões
 
-- A versão vigente inclui **sete tabelas**, incluindo `triages`. O trecho antigo
-  de tarefas que menciona seis tabelas antecede a extensão de triagem. A fila é
-  consulta dos tickets; não haverá tabela ou worker novo para ela.
-- Raízes do projeto-alvo, workspaces e artefatos são relativas ao arquivo de
-  configuração e ficam sob seu diretório. O alvo deve existir; raízes de runtime
-  podem ser criadas futuramente, fora do alvo e sem sobreposição. Não são criadas
-  pelo parser. Checagens reais de symlinks ocorrem ao carregar a configuração;
-  o executor deverá revalidar caminhos imediatamente antes dos efeitos.
+- O baseline implementado inclui **sete tabelas**, incluindo `triages`, e agora persiste no ticket a chave, a versão e o snapshot com hash da configuração selecionada. A configuração continua em arquivo validado; não haverá tabela de catálogo nem tabela ou worker separado para a fila.
+- A criação e a edição validam a configuração disponível antes da transação. A validação de divergência no início da implementação pertence às tarefas 8 e 38.
+- Raízes do sistema-alvo, workspaces e artefatos são relativas à configuração e ficam sob seu diretório. O alvo deve existir; raízes de runtime podem ser criadas futuramente, fora do alvo e sem sobreposição. Não são criadas pelo parser. Checagens reais de symlinks ocorrem ao carregar a configuração; o executor deverá revalidar caminhos imediatamente antes dos efeitos.
 - `allowedPaths`, `testPaths` e `documentationPaths` são diretórios, sem globs.
   `testPaths` deve estar contido em `allowedPaths` por componentes de caminho.
   Comandos são objetos do operador, nunca strings de shell ou texto de tickets.

@@ -77,6 +77,9 @@ export const tickets = pgTable(
   "tickets",
   {
     id: serial("id").primaryKey(),
+    targetSystemKey: varchar("target_system_key", { length: 64 }).notNull(),
+    targetConfigVersion: integer("target_config_version").notNull(),
+    targetConfigSnapshot: object("target_config_snapshot").notNull(),
     title: varchar("title", { length: 140 }).notNull(),
     description: text("description").notNull(),
     expectedBehavior: text("expected_behavior").notNull(),
@@ -92,6 +95,7 @@ export const tickets = pgTable(
   },
   (table) => [
     check("tickets_positive_version", sql`${table.version} > 0`),
+    check("tickets_positive_config_version", sql`${table.targetConfigVersion} > 0`),
     check("tickets_positive_id", sql`${table.id} > 0`),
     index("tickets_queue_idx").on(table.status, table.updatedAt, table.id),
   ],

@@ -13,7 +13,7 @@ Ainda não estão comprovados funcionamento de ponta a ponta, ganho de produtivi
 | Fato verificável | Fonte | Limite |
 | --- | --- | --- |
 | Aplicação ainda não implementada | README e árvore da versão atual | Sem build/testes funcionais para executar |
-| Uma spec canônica com requisitos, design e 31 tarefas | `.kiro/specs/resolva-mvp/` | Planejamento não equivale a funcionalidades prontas |
+| Uma spec canônica com requisitos, design e tarefas incrementais | `.kiro/specs/resolva-mvp/` | Planejamento não equivale a funcionalidades prontas |
 | Regras/arquitetura ativas com `inclusion: always` | `.kiro/steering/` | Aplicabilidade ao executor do alvo ainda precisa de ensaio |
 | Capacidade operacional disponível | Ainda não medida | Não informa prazo, cobertura de suporte ou custo de operação |
 | Kiro documenta headless, motor e permissões | Fontes oficiais consultadas nesta análise | Não prova conta, modelo ou perfil de produção |
@@ -26,8 +26,8 @@ A base examinada concentra a documentação ativa em `.kiro/`. Requisitos comerc
 | --- | --- | --- |
 | Problema de negócio | Favorável | Defeitos pequenos e repetitivos geram demanda recorrente por triagem e correção |
 | Produto | Favorável com escopo controlado | Caso real verificável, revisão humana e tratamento explícito de impedimentos |
-| Tecnologia | Favorável com risco moderado/alto de integração | Ensaio de Kiro/GitHub antes da expansão do produto |
-| Operação | Favorável em ambiente local ou privado | Um projeto-alvo confiável, isolamento e ausência de dados de produção |
+| Tecnologia | Favorável com risco moderado/alto de integração | Ensaio de Kiro CLI headless/GitLab CI/MR antes da expansão do produto |
+| Operação | Favorável em ambiente local ou privado | Perfis de sistema-alvo previamente configurados, isolamento e ausência de dados de produção |
 | Prazo | Indeterminado | Confirmar capacidade e medir o primeiro marco |
 | Financeiro | Não quantificado | Medir consumo de IA, infraestrutura, suporte e retrabalho |
 | Mercado | Não validado | Entrevistar equipes, testar disposição de pagamento e medir retenção |
@@ -47,8 +47,8 @@ A receita pode ser validada por uma combinação de assinatura por workspace, co
 
 | Abordagem | Vantagem | Custo/limite | Recomendação |
 | --- | --- | --- | --- |
-| Painel local + backend + Kiro + GitHub | Atende a jornada definida | Integração de processos e estados | Manter |
-| CLI + relatório + PR | Menos interface e esforço | Muda o objetivo visual | Redução de escopo possível, mediante decisão |
+| Pipeline CI + Merge Request | Limite claro entre o Resolva e o sistema-alvo | Depende de callback, credenciais e reconciliação | Manter no MVP |
+| CLI + relatório + MR | Menos interface e esforço | Muda o objetivo visual | Redução de escopo possível, mediante decisão |
 | Agente próprio por API | Controle fino das ferramentas | Aumenta implementação e avaliação | Adiar |
 
 Manter TypeScript já escolhido. Um alvo Java/JUnit pode ser evolução, mas a compatibilidade não está incluída no primeiro adaptador Vitest JSON. Não inferir suporte a um sistema como SGN3 a partir de um piloto pequeno.
@@ -69,7 +69,7 @@ Trabalho futuro, sem aplicação completa. Lucas/Sergio são donos propostos.
 
 ## 6. Estimativa por pacote
 
-Pacotes são agrupamentos das 31 tarefas existentes, não novas specs concorrentes.
+Pacotes são agrupamentos das tarefas atuais, não novas specs concorrentes. A inclusão da configuração única por ticket e do fluxo pipeline CI/Kiro headless/MR deve ser considerada no esforço de integração.
 
 | Pacote | Pessoas-hora de referência |
 | --- | ---: |
@@ -77,8 +77,8 @@ Pacotes são agrupamentos das 31 tarefas existentes, não novas specs concorrent
 | P01 — fundação e contratos | 24 |
 | P02 — tickets, triagem e API | 48 |
 | P03 — executor, validação, recuperação e orquestração | 56 |
-| P04 — Kiro, contexto e relatórios | 40 |
-| P05 — GitHub e reconciliação | 32 |
+| P04 — pipeline CI/Kiro, contexto e relatórios | 44 |
+| P05 — GitLab/MR e reconciliação | 36 |
 | P06 — interface, fila e operação | 48 |
 | P07 — QA, piloto e operação | 36 |
 | **Subtotal** | **300** |

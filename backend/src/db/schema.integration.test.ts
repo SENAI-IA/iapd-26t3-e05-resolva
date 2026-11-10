@@ -23,8 +23,8 @@ afterAll(async () => {
 
 async function ticket() {
   const result = await database.pool.query<{ id: number }>(
-    `INSERT INTO tickets (title, description, expected_behavior, category)
-     VALUES ('Quantidade incorreta', 'Descrição suficiente para um ticket', 'Total conforme a quantidade', 'calculo') RETURNING id`,
+    `INSERT INTO tickets (target_system_key, target_config_version, target_config_snapshot, title, description, expected_behavior, category)
+     VALUES ('demo', 1, '{}', 'Quantidade incorreta', 'Descrição suficiente para um ticket', 'Total conforme a quantidade', 'calculo') RETURNING id`,
   );
   const row = result.rows[0];
   if (!row) throw new Error("Ticket não retornado.");
@@ -140,7 +140,7 @@ describe("schema e migrações PostgreSQL", () => {
     try {
       await client.query("BEGIN");
       const result = await client.query<{ id: number }>(
-        "INSERT INTO tickets(title, description, expected_behavior, category) VALUES ('Falha', 'Descrição', 'Esperado', 'calculo') RETURNING id",
+        "INSERT INTO tickets(target_system_key, target_config_version, target_config_snapshot, title, description, expected_behavior, category) VALUES ('demo', 1, '{}', 'Falha', 'Descrição', 'Esperado', 'calculo') RETURNING id",
       );
       id = result.rows[0]?.id;
       await expect(

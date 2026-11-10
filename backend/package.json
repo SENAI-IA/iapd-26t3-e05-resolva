@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "tsx watch --env-file-if-exists=../.env src/main.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
+    "start": "node --env-file-if-exists=../.env dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
@@ -14,6 +14,7 @@
     "db:migrate": "tsx --env-file-if-exists=../.env src/db/migrate-cli.ts"
   },
   "dependencies": {
+    "@trpc/server": "^11.25.0",
     "drizzle-orm": "~0.45.4",
     "fastify": "^5.0.0",
     "pg": "^8.23.1",

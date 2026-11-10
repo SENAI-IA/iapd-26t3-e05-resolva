@@ -2,10 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadProjectConfig, parseProjectConfig } from "./project.js";
+import { loadProjectConfig, parseProjectConfig, createTargetSystemSnapshot } from "./project.js";
 
 function input() {
   return {
+    targetSystemKey: "demo",
+    displayName: "Sistema demo",
+    version: 1,
+    pipelineRef: "main",
     repository: "equipe/alvo",
     baseBranch: "main",
     repositoryRoot: "target",
@@ -71,8 +75,21 @@ describe("configuração do projeto", () => {
     expect(original).not.toHaveProperty("maxRounds");
   });
 
-  it.each([0, 4, 1.5])("recusa maxRounds=%s", (maxRounds) => {
-    expect(() => parseProjectConfig({ ...input(), maxRounds })).toThrow();
+  it("gera snapshot versionado sem alterar a configuração validada", () => {
+    const config = parseProjectConfig(input());
+    const snapshot = createTargetSystemSnapshot(config);
+    expect(snapshot).toMatchObject({
+      targetSystemKey: "demo",
+      version: 1,
+      snapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+    expect(snapshot).not.toBe(config);
+    expect(config).not.toHaveProperty("snapshotHash");
+  });
+  it("recusa identidade ou referência de pipeline inválidas", () => {
+    expect(() => parseProjectConfig({ ...input(), targetSystemKey: "Demo System" })).toThrow();
+    expect(() => parseProjectConfig({ ...input(), displayName: " " })).toThrow();
+    expect(() => parseProjectConfig({ ...input(), pipelineRef: "main; echo" })).toThrow();
   });
   it.each([
     ["runTimeoutSeconds", 59],

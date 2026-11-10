@@ -114,7 +114,7 @@ export const projectConfigSchema = z
     targetSystemKey: targetSystemKeySchema,
     displayName: targetSystemDisplayNameSchema,
     version: targetSystemVersionSchema.default(1),
-    pipelineRef: z.string().min(1).max(255).refine(validBranch),
+    workflowRef: z.string().min(1).max(255).refine(validBranch),
     repository: z
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u)

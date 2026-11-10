@@ -9,7 +9,7 @@ function input() {
     targetSystemKey: "demo",
     displayName: "Sistema demo",
     version: 1,
-    pipelineRef: "main",
+    workflowRef: "main",
     repository: "equipe/alvo",
     baseBranch: "main",
     repositoryRoot: "target",
@@ -89,7 +89,7 @@ describe("configuração do projeto", () => {
   it("recusa identidade ou referência de pipeline inválidas", () => {
     expect(() => parseProjectConfig({ ...input(), targetSystemKey: "Demo System" })).toThrow();
     expect(() => parseProjectConfig({ ...input(), displayName: " " })).toThrow();
-    expect(() => parseProjectConfig({ ...input(), pipelineRef: "main; echo" })).toThrow();
+    expect(() => parseProjectConfig({ ...input(), workflowRef: "main; echo" })).toThrow();
   });
   it.each([
     ["runTimeoutSeconds", 59],

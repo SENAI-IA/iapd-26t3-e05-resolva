@@ -29,11 +29,11 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
 - [ ] 5. Implementar estados, classificações, validade de triagem, elegibilidade, validações de campos e códigos de erro do domínio.
   - Parcial: contratos públicos, validação de conteúdo, categorias, erros, transições humanas, decisão de triagem e elegibilidade implementados. Ajustes de PR dependem dos modos de execução da tarefa 19.
   - Requisitos: R01, R02, R04, R10, R11, R19, R20, R26, R27, R29, R30, R31, R32, R33, R34, R35, R37.
-- [ ] 6. Implementar repositories transacionais para tickets, triagens, eventos, fila, execuções, entregas e artefatos, incluindo pipeline e Merge Request.
+- [ ] 6. Implementar repositories transacionais para tickets, triagens, eventos, fila, execuções, entregas e artefatos, incluindo pipeline e Pull Request.
   - Parcial: tickets, histórico, controle de versão e invalidação atômica da triagem; leitura de resumos de execução/entrega. Reservas de implementação, pipeline e demais repositories pendentes.
   - Requisitos: R01, R04, R05, R06, R07, R10, R11, R16, R18, R19, R20, R21, R23, R28, R30, R31, R32, R33, R34, R36, R37.
 - [ ] 7. Implementar procedures tRPC de tickets, configuração e triagem, com paginação, busca literal, seleção do sistema-alvo, controle de versão, mensagens, contestação, complementação e histórico.
-  - Parcial: nove procedures de tickets implementadas com contratos de entrada/saída e testes HTTP. Seleção da configuração, fila, início de implementação e ajustes de MR permanecem pendentes.
+  - Parcial: nove procedures de tickets implementadas com contratos de entrada/saída e testes HTTP. Seleção da configuração, fila, início de implementação e ajustes de PR permanecem pendentes.
   - Requisitos: R01, R02, R03, R04, R10, R11, R17, R19, R20, R26, R27, R31, R32, R33, R34.
 - [ ] 8. Implementar procedures tRPC de triagem, fila, implementação e ambiente, incluindo seleção da configuração do ticket, idempotência por `requestKey`, validação de elegibilidade e disparo manual da pipeline CI.
   - Requisitos: R05, R06, R07, R08, R21, R23, R28, R29, R30, R32, R33, R34, R35, R37.
@@ -56,13 +56,13 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
 - [ ] 15. Implementar triagem somente leitura e fases de implementação para bugs e melhorias, disparadas pela pipeline CI, com limite máximo de três rodadas de correção e snapshot imutável da configuração do sistema-alvo.
   - Requisitos: R05, R09, R10, R12, R13, R14, R26, R27, R28, R29, R30, R32, R34, R35.
 
-## GitLab e entrega
+## GitHub e entrega
 
 - [ ] 16. Implementar cópia de trabalho derivada da configuração do ticket, validação de caminhos, diff, arquivos sensíveis, limites e SHA validado.
   - Requisitos: R13, R15, R18, R24, R34, R37.
 - [ ] 17. Implementar disparo da pipeline CI com argumentos/variáveis validados, credencial isolada, branch e commit no repositório configurado.
   - Requisitos: R15, R18, R24, R25, R34, R35.
-- [ ] 18. Implementar criação, atualização e reconciliação idempotente de Merge Request vinculada ao ticket, sem force push.
+- [ ] 18. Implementar criação, atualização e reconciliação idempotente de Pull Request vinculada ao ticket, sem force push.
   - Requisitos: R15, R16, R17, R18, R36.
 - [ ] 19. Implementar modos `initial`, `retry`, `review_behavior` e `review_refinement`, preservando entregas e execuções.
   - Requisitos: R16, R17, R18, R20.
@@ -90,7 +90,7 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
   - Requisitos: R06, R07, R16, R18, R22, R23, R24, R28, R29, R31, R32.
 - [ ] 28. Criar testes de executor com comandos falsos para triagem somente leitura, tentativa de alteração proibida, timeout, morte do pai, baseline, reprodução de bug, melhoria e três rodadas.
   - Requisitos: R09, R12, R13, R14, R22, R26, R27, R28.
-- [ ] 29. Criar fixtures de integração da pipeline CI, GitLab e Kiro sem publicar MR real nos testes.
+- [ ] 29. Criar fixtures de integração da pipeline CI, GitHub e Kiro sem publicar PR real nos testes.
   - Requisitos: R15, R16, R17, R18, R25, R35, R36.
 - [ ] 30. Documentar instalação, configuração, triagem, fila, implementação, execução, arquitetura, prompts, limitações, operação e evidências no README.
   - Requisitos: R01–R37.
@@ -119,7 +119,7 @@ As tarefas 1–31 permanecem preservadas. As tarefas abaixo tornam explícita a 
 - [ ] 34. Expor `triages.start`, `triages.byId`, `triages.list`, `tickets.contestTriage`, `implementations.queue` e `implementations.start` com Zod, idempotência e validação transacional.
   - Parcial: procedures de triagem e contestação disponíveis. O início requer um executor injetado, exercitado com integração falsa. Fila e início de implementação pendentes.
   - Requisitos: R05–R08, R26–R32.
-- [ ] 35. Criar prompt de triagem somente leitura, relatório estruturado das cinco classificações e integração com a pipeline CI sem edição, Git ou GitLab durante a triagem.
+- [ ] 35. Criar prompt de triagem somente leitura, relatório estruturado das cinco classificações e integração com a pipeline CI sem edição, Git ou GitHub durante a triagem.
   - Parcial: configuração por execução, prompt e verificação de identidade, fontes, hashes e relatório v1 integrados com processo simulado. A política efetiva e o uso autenticado permanecem em [ensaio de compatibilidade](docs/kiro-compatibility.md).
   - Requisitos: R05, R09, R10, R24, R26–R28.
 - [ ] 36. Implementar na interface a distinção entre `Analisar ticket` e `Iniciar implementação`, fila persistida, mensagens de decisão, contestação e triagem desatualizada.
@@ -132,10 +132,10 @@ As tarefas 1–31 permanecem preservadas. As tarefas abaixo tornam explícita a 
   - Requisitos: R33, R34, R37.
 - [ ] 39. Integrar o início da implementação ao disparo de uma pipeline CI, enviando somente o snapshot do ticket, configuração, contexto necessário e `executionId`; a pipeline executa o Kiro CLI headless e devolve relatório/callback validado.
   - Requisitos: R08, R12–R16, R24, R30, R34, R35.
-- [ ] 40. Criar e reconciliar a Merge Request do sistema-alvo configurado no ticket, vinculando pipeline, execução, SHA validado e histórico sem duplicação.
+- [ ] 40. Criar e reconciliar a Pull Request do sistema-alvo configurado no ticket, vinculando pipeline, execução, SHA validado e histórico sem duplicação.
   - Requisitos: R15–R18, R25, R36.
 
-A ordem recomendada passa a ser: fundação e configuração/tickets (1–9, 38), triagem e fila (32–37), integração CI/Kiro (10–15, 39), GitLab/MR (16–19, 40), frontend completo (20–24) e demonstração/qualidade (25–31). Nenhuma implementação é iniciada por esta atualização documental.
+A ordem recomendada passa a ser: fundação e configuração/tickets (1–9, 38), triagem e fila (32–37), integração CI/Kiro (10–15, 39), GitHub/PR (16–19, 40), frontend completo (20–24) e demonstração/qualidade (25–31). Nenhuma implementação é iniciada por esta atualização documental.
 
 ## Complemento de execução e divisão — proposta v1
 
@@ -146,7 +146,7 @@ As 31 tarefas originais e as extensões 32–40 preservam sua numeração. A ord
 - [ ] 0.1. Confirmar configuração única do sistema-alvo, pipeline, conta/modelo, orçamento e capacidade disponíveis. Donos propostos: Sergio/Lucas.
 - [ ] 0.2. Registrar CLI/versão, flags instaladas, autenticação sem valor secreto e política efetiva por fase em `.kiro/specs/resolva-mvp/docs/kiro-compatibility.md`.
 - [ ] 0.3. Provar leitura/edição permitidas e recusa de shell, MCP, web, subagente e caminho externo na pipeline, incluindo configurações globais/workspace/hooks.
-- [ ] 0.4. Capturar eventos públicos e relatório v1, observar teste vermelho/verde e, com acesso autorizado, confirmar uma MR no repositório configurado. Testes automatizados não fazem esse ensaio.
+- [ ] 0.4. Capturar eventos públicos e relatório v1, observar teste vermelho/verde e, com acesso autorizado, confirmar uma PR no repositório configurado. Testes automatizados não fazem esse ensaio.
 - [ ] 0.5. Registrar duração/uso disponível e decisão prosseguir/replanejar. Conta ausente ou mock aprovado não comprovam o fluxo real.
 
 Esforço de referência do Gate 0: 16 pessoas-hora. Não marcar concluído por documentação de intenção.
@@ -168,7 +168,7 @@ Esforço de referência do Gate 0: 16 pessoas-hora. Não marcar concluído por d
 | `backend/src/executor/instanceGuard.ts`      | `acquireInstanceGuard(database: AppDatabase, runtimeRoot: string): Promise<InstanceGuard>`; `assertOwned()`/`release()` assíncronos                                 | Sergio          |
 | `backend/src/integrations/ci/client.ts`      | `triggerPipeline(input: PipelineInput): Promise<PipelineReference>`; `reconcilePipeline(executionId: string): Promise<PipelineResult>`                              | Lucas/Amadeu    |
 | `backend/src/integrations/kiro/report.ts`    | `parseRunReport(value: unknown, expected: ReportIdentity): RunReport`                                                                                               | Lucas           |
-| `backend/src/integrations/gitlab/publish.ts` | `publishValidated(input: PublishInput): Promise<MergeRequestReference>`; `reconcileDelivery(deliveryId: string): Promise<ReconciliationResult>`                     | Amadeu          |
+| `backend/src/integrations/github/publish.ts` | `publishValidated(input: PublishInput): Promise<PullRequestReference>`; `reconcileDelivery(deliveryId: string): Promise<ReconciliationResult>`                     | Amadeu          |
 | `backend/src/services/executionService.ts`   | `startExecution(input: StartExecutionInput): Promise<StartExecutionResult>`                                                                                         | Sergio          |
 | `backend/src/executor/runExecution.ts`       | `runExecution(executionId: string, dependencies: ExecutionDependencies): Promise<void>`                                                                             | Sergio          |
 | `backend/src/executor/recovery.ts`           | `recoverInterruptedExecutions(database: AppDatabase, guard: InstanceGuard): Promise<number>`                                                                        | Sergio          |
@@ -176,7 +176,7 @@ Esforço de referência do Gate 0: 16 pessoas-hora. Não marcar concluído por d
 
 Tipos operacionais em `backend/src/executor/types.ts`: `CommandInput` contém executable/args/cwd/timeout/env mínimo/callback de saída; `CommandResult` contém exitCode/signal/timedOut/durationMs e referências filtradas; `Workspace` contém caminho e SHA de origem; `ChangePolicy` contém fase/caminhos/limites e manifesto de testes; `DiffSummary` contém paths/linhas/hash. `ValidationResult` normaliza total/passed/failed/errors/failedTests.
 
-`ConfiguredCommand` e `TargetSystemConfig` vêm do schema de configuração. `PipelineInput` contém execução, ref da pipeline, snapshot do ticket/configuração, branch e contexto; `PipelineReference` contém ID e URL externos. `ReportIdentity` contém execução/fase/rodada. `PublishInput` inclui entrega/execução/workspace/validated SHA/corpo factual; `ReconciliationResult` discrimina `not_published`, `publish_pending`, `confirmed`, `blocked`, com SHAs e identidade. Entradas/saídas do serviço de execução correspondem à tabela de API do design. `InstanceGuard` invalida posse em perda de conexão, sem continuar com reconexão silenciosa.
+`ConfiguredCommand` e `TargetSystemConfig` vêm do schema de configuração. `WorkflowInput` contém execução, workflowRef, snapshot do ticket/configuração, branch e contexto; `WorkflowReference` contém ID e URL externos. `ReportIdentity` contém execução/fase/rodada. `PublishInput` inclui entrega/execução/workspace/validated SHA/corpo factual; `ReconciliationResult` discrimina `not_published`, `publish_pending`, `confirmed`, `blocked`, com SHAs e identidade. Entradas/saídas do serviço de execução correspondem à tabela de API do design. `InstanceGuard` invalida posse em perda de conexão, sem continuar com reconexão silenciosa.
 
 ### Arquivos e validação por tarefa
 
@@ -200,9 +200,9 @@ Caminhos nesta tabela são entregáveis futuros. Requisitos completos continuam 
 | 14     | Lucas           | `backend/src/integrations/kiro/{client,report,events,prompts,profile}.ts`                               | JSONL fragmentado; relatório inválido; permissão por fase                                          |
 | 15     | Sergio          | `backend/src/executor/runExecution.ts`                                                                  | Ordem real, teste congelado e ausência de quarta correção                                          |
 | 16     | Sergio          | `backend/src/executor/workspace.ts`                                                                     | Diff de adições/remoções/renomes, caminhos e SHA limpo                                             |
-| 17     | Amadeu          | `backend/src/integrations/ci/client.ts`, `backend/src/integrations/gitlab/client.ts`                    | Pipeline com variáveis validadas, credencial só no processo autorizado e branch/commit controlados |
-| 18     | Amadeu          | `backend/src/integrations/gitlab/publish.ts`                                                            | Callback/resposta perdida reconcilia; consulta confirma branch/marcador/SHA e vincula MR ao ticket |
-| 19     | Sergio/Amadeu   | `executionService.ts`, `runExecution.ts`, `deliveryRepository.ts`                                       | Ajuste preserva MR; reabertura após merge cria nova entrega                                        |
+| 17     | Amadeu          | `backend/src/integrations/ci/client.ts`, `backend/src/integrations/github/client.ts`                    | Pipeline com variáveis validadas, credencial só no processo autorizado e branch/commit controlados |
+| 18     | Amadeu          | `backend/src/integrations/github/publish.ts`                                                            | Callback/resposta perdida reconcilia; consulta confirma branch/marcador/SHA e vincula PR ao ticket |
+| 19     | Sergio/Amadeu   | `executionService.ts`, `runExecution.ts`, `deliveryRepository.ts`                                       | Ajuste preserva PR; reabertura após merge cria nova entrega                                        |
 | 20     | Larissa         | `web/src/index.css`, componentes/layout e `web/src/trpc.ts`                                             | Teclado/tokens e bundle sem runtime secreto                                                        |
 | 21     | Larissa         | `web/src/routes/tickets/{index,new}.tsx`, detalhes                                                      | Campos, busca, versão conflitante e erros acessíveis                                               |
 | 22     | Larissa         | `web/src/routes/tickets/$ticketId.tsx`                                                                  | Complementar sem IA; tipo de ajuste; confirmações e reabertura                                     |
@@ -212,7 +212,7 @@ Caminhos nesta tabela são entregáveis futuros. Requisitos completos continuam 
 | 26     | Felipe + donos  | Testes de domínio, repositories e routers                                                               | Entradas/estados/versões e transações                                                              |
 | 27     | Amadeu + donos  | Integrações PostgreSQL/Git/recuperação                                                                  | Concorrência/idempotência/falha parcial em recursos descartáveis                                   |
 | 28     | Sergio          | `backend/src/executor/*.test.ts` e `*.integration.test.ts`                                              | Processos Linux reais e comandos falsos no orquestrador                                            |
-| 29     | Lucas/Amadeu    | Fixtures CI/GitLab/Kiro e adaptadores falsos                                                            | Suíte sem conta/modelo/rede; nenhuma pipeline ou MR real                                           |
+| 29     | Lucas/Amadeu    | Fixtures CI/GitHub/Kiro e adaptadores falsos                                                            | Suíte sem conta/modelo/rede; nenhuma pipeline ou PR real                                           |
 | 30     | Equipe/Larissa  | `README.md`, `.kiro/specs/resolva-mvp/docs/{demo,operations,kiro-compatibility}.md`                     | Instruções executadas, cenários e limitações                                                       |
 | 31     | Amadeu + equipe | Relatório de evidência filtrado e matriz de rastreabilidade                                             | Testes/checks e ensaio real separados; pendências declaradas                                       |
 
@@ -239,16 +239,16 @@ Todos os passos abaixo são futuros. Testes de cada componente pertencem à mesm
 #### E3 — adaptadores independentes (14, 17–18, 29)
 
 - [ ] Lucas escreve `report.test.ts`, `events.test.ts`, `client.test.ts`: identidade errada, relatório acima de 64 KiB, callback repetido, resposta inválida, fragmentos JSONL/Unicode e evento desconhecido.
-- [ ] Amadeu escreve `pipeline.test.ts`, `mergeRequest.test.ts`, `gitlab.integration.test.ts`: pipeline disparada sem MR, resposta perdida, MR fechada/integrada, SHA divergente e marcador do corpo.
-- [ ] Confirmar falhas; implementar adaptadores com dependências injetadas e pipeline/GitLab falsos. Nenhum teste publica pipeline ou MR real.
+- [ ] Amadeu escreve `pipeline.test.ts`, `mergeRequest.test.ts`, `github.integration.test.ts`: pipeline disparada sem PR, resposta perdida, PR fechada/integrada, SHA divergente e marcador do corpo.
+- [ ] Confirmar falhas; implementar adaptadores com dependências injetadas e pipeline/GitHub falsos. Nenhum teste publica pipeline ou PR real.
 - [ ] Exigir callback válido, identidade completa e SHA coerente para concluir a execução; reexecutar os testes/tipos.
-- [ ] PRs/commits separados: `feat: integra pipeline e Kiro` e `feat: publica e reconcilia merge requests`.
+- [ ] PRs/commits separados: `feat: integra pipeline e Kiro` e `feat: publica e reconcilia Pull Requests`.
 
 #### E4 — orquestração e recuperação (6, 8, 15, 19, 27–28)
 
 - [ ] Escrever `executionRepository.integration.test.ts`: dois tickets concorrentes geram uma reserva; replay de chave devolve mesmo ID mesmo com versão posterior; chave de outro ticket recusa.
-- [ ] Escrever `runExecution.test.ts`: configuração inválida não dispara pipeline; asserção antecede fix; terceira falha termina; SHA divergente não confirma MR; perguntas mudam estado; sem alterações no teste congelado.
-- [ ] Acrescentar cenários `review_behavior`/`review_refinement`, checkpoint anterior ao disparo, resposta perdida reconciliada sem nova pipeline, MR fechada bloqueada, reabertura pós-merge com nova entrega e recovery sem repetição.
+- [ ] Escrever `runExecution.test.ts`: configuração inválida não dispara pipeline; asserção antecede fix; terceira falha termina; SHA divergente não confirma PR; perguntas mudam estado; sem alterações no teste congelado.
+- [ ] Acrescentar cenários `review_behavior`/`review_refinement`, checkpoint anterior ao disparo, resposta perdida reconciliada sem nova pipeline, PR fechada bloqueada, reabertura pós-merge com nova entrega e recovery sem repetição.
 - [ ] Observar falhas, implementar `ExecutionDependencies`, repositories/serviço/rotina e transações finais. Iniciar em background somente após commit; tratar rejeições e indisponibilidade do banco.
 - [ ] Rodar unitários, integração de reserva e tipos; commit `feat: orquestra execuções e preserva histórico`.
 
@@ -273,7 +273,7 @@ Gate 0 pode ocorrer em paralelo à fundação. E1 e E2 estabilizam tipos/infraes
 
 Foco de revisão: replay de chave com versão alterada; confirmação de PR após resposta perdida; relatório legítimo sem dados de teste quando há pergunta; compilação diferente de asserção; processos órfãos/perda de lock; consulta final de todos os eventos. Cada classe tem caso explícito acima.
 
-A proposta original não executou tarefas; o estado atual está no início deste documento e em `docs/fundacao.md`. Integração real exige repositório alvo separado, pipeline GitLab, modelo/credencial Kiro e credencial de disparo. A ausência desses itens é pendência explícita, sem impedir testes locais com fakes. Depois da revisão deste pacote, a implementação pode seguir estas entregas; este pedido documental não inicia execução paga ou correção de sistemas externos.
+A proposta original não executou tarefas; o estado atual está no início deste documento e em `docs/fundacao.md`. Integração real exige repositório alvo separado, pipeline GitHub, modelo/credencial Kiro e credencial de disparo. A ausência desses itens é pendência explícita, sem impedir testes locais com fakes. Depois da revisão deste pacote, a implementação pode seguir estas entregas; este pedido documental não inicia execução paga ou correção de sistemas externos.
 
 ### Contratos adicionais de triagem
 
@@ -284,4 +284,4 @@ A proposta original não executou tarefas; o estado atual está no início deste
 - `backend/src/integrations/kiro/report.ts`: validar `kind`, `classification`, fontes, referências, perguntas, critérios, hashes e identidade do ticket/versão.
 - `web/src/routes/tickets/$ticketId/triage.tsx` e `web/src/routes/implementations/index.tsx`: conclusão persistida, contestação, fila, elegibilidade e início manual.
 
-A triagem deve ser testável sem Kiro pago e sem pipeline/MR real. O início de implementação deve aceitar somente uma triagem válida e idempotente para a mesma intenção; qualquer divergência retorna erro público e registra o motivo no histórico.
+A triagem deve ser testável sem Kiro pago e sem pipeline/PR real. O início de implementação deve aceitar somente uma triagem válida e idempotente para a mesma intenção; qualquer divergência retorna erro público e registra o motivo no histórico.

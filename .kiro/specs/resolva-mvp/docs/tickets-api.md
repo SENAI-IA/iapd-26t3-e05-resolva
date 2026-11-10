@@ -38,7 +38,7 @@ O contrato v2 da triagem prevalece sobre a antiga entrada genérica de execuçã
 - DTOs usam datas ISO UTC e campos explícitos. `byId` mostra ticket e resumos da
   execução/entrega, sem snapshots internos; erros HTTP tRPC não expõem stack,
   mensagens do banco ou dados de validação internos.
-- A criação exige configuração de sistema-alvo válida; o serviço recusa chave ausente ou divergente e grava o snapshot operacional sem credenciais. Categorias são validadas contra a configuração selecionada. Ausência de banco gera erro público de pré-condição mantendo o healthcheck disponível. A ausência de GitLab CI/Kiro ainda não impede cadastro quando a configuração local está válida. O frontend continuará estático nesta entrega.
+- A criação exige configuração de sistema-alvo válida; o serviço recusa chave ausente ou divergente e grava o snapshot operacional sem credenciais. Categorias são validadas contra a configuração selecionada. Ausência de banco gera erro público de pré-condição mantendo o healthcheck disponível. A ausência de GitHub CI/Kiro ainda não impede cadastro quando a configuração local está válida. O frontend continuará estático nesta entrega.
 - Repositories de reserva/execução/entrega, elegibilidade completa e procedures de
   triagem ficam para a próxima fatia; tarefas amplas não serão marcadas inteiras
   só por este recorte. Testes não usam banco do operador ou serviços externos.

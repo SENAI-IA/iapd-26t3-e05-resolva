@@ -8,6 +8,7 @@ import { defaultCategories } from "./domain/contracts.js";
 import { createTicketRepository } from "./repository/ticketRepository.js";
 import { createTriageRepository } from "./repository/triageRepository.js";
 import { createImplementationRepository } from "./repository/implementationRepository.js";
+import { createGithubClient } from "./integrations/github/cli.js";
 import { createServer } from "./server.js";
 import { createTicketService } from "./services/ticketService.js";
 import { createTriageService } from "./services/triageService.js";
@@ -68,6 +69,7 @@ try {
           implementationService: createImplementationService(
             createImplementationRepository(database),
             { ready: false, sourceHashes: {} },
+            createGithubClient(environment.GH_TOKEN ? { token: environment.GH_TOKEN } : {}),
           ),
         }
       : {},

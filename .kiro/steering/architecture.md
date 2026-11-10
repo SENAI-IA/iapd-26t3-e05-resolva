@@ -6,7 +6,7 @@ inclusion: always
 
 ## Limite do produto
 
-O Resolva recebe tickets, realiza triagem baseada em evidências e, somente após início manual, dispara uma pipeline CI para implementar uma correção ou melhoria no sistema-alvo configurado no ticket, executa testes, publica uma Merge Request e mantém evidências para revisão humana. O MVP é local, usa uma configuração de sistema-alvo e permite uma execução ativa por vez.
+O Resolva recebe tickets, realiza triagem baseada em evidências e, somente após início manual, dispara uma execução controlada para implementar uma correção ou melhoria no sistema-alvo configurado no ticket, executa testes, publica um Pull Request no GitHub e mantém evidências para revisão humana. O MVP é local, usa uma configuração de sistema-alvo e permite uma execução ativa por vez.
 
 Ficam fora do MVP autenticação de usuários, múltiplos sistemas-alvo, múltiplos provedores, cadastro livre de repositórios/comandos pelo ticket, webhooks, deploy automático, merge automático, fila distribuída, alterações em dados de negócio e execução em produção. A fila de implementação é persistida, mas não é consumida automaticamente por worker ou scheduler.
 
@@ -18,7 +18,7 @@ Ficam fora do MVP autenticação de usuários, múltiplos sistemas-alvo, múltip
 - `backend/src/executor`: fases, limites, comandos, evidências e recuperação de triagem e implementação.
 - `backend/src/integrations/ci`: disparo, callback e reconciliação da pipeline.
 - `backend/src/integrations/kiro`: prompts, relatórios JSON e eventos usados pela pipeline.
-- `backend/src/integrations/gitlab`: branch, commit, Merge Request e reconciliação.
+- `backend/src/integrations/github`: autenticação, branch, commit, Pull Request e reconciliação usando o executável local `gh`.
 - PostgreSQL em Docker: configuração, tickets, triagens, eventos, execuções, fila, entregas, artefatos e snapshots sem segredos.
 
 O frontend importa somente tipos públicos do backend. Não importa banco, configuração secreta ou executor.
@@ -27,12 +27,12 @@ O frontend importa somente tipos públicos do backend. Não importa banco, confi
 
 1. Validar e persistir o ticket em `aberto`, exigindo a configuração do sistema-alvo.
 2. O usuário aciona `analisar ticket`; o backend reserva uma execução de triagem, registra snapshot e muda o ticket para `em_triagem`.
-3. A triagem consulta relato, comportamento esperado, regras, documentação, código e evidências autorizadas. Ela não edita código, não cria branch e não publica MR.
+3. A triagem consulta relato, comportamento esperado, regras, documentação, código e evidências autorizadas. Ela não edita código, não cria branch e não publica PR.
 4. Persistir uma mensagem de triagem com classificação, justificativa, comportamento observado, regra esperada, fontes, incertezas e próxima ação.
 5. `falso_positivo` e `entendimento_incorreto` mudam o ticket para `recusado`. `inconclusivo` muda para `aguardando_informacoes` ou permanece `aberto` quando aguarda revisão humana. `bug` e `melhoria` mudam para `aguardando_implementacao`.
 6. O usuário decide manualmente iniciar uma implementação elegível. O backend valida classificação, triagem, configuração, critérios e exclusividade.
-7. O backend dispara uma pipeline CI. A pipeline executa o Kiro CLI headless, testes e validações, e cria a Merge Request.
-8. Após callback válido com MR e SHA aprovados, mudar o ticket para `aguardando_revisao`.
+7. O backend inicia a execução controlada usando o `gh` instalado na máquina da aplicação. A execução chama os workflows configurados, executa o Kiro CLI headless, testes e validações, e cria o Pull Request.
+8. Após callback válido com PR e SHA aprovados, mudar o ticket para `aguardando_revisao`.
 9. Resolver somente após confirmação humana de merge e verificação em teste.
 9. Resolver somente após confirmação humana de merge e verificação em teste.
 
@@ -58,7 +58,7 @@ O estado do ticket, a classificação, a validade da triagem e o resultado da ex
 - `tickets`: chave do sistema-alvo, snapshot/version da configuração, relato, comportamento esperado, categoria, status, versão otimista, classificação vigente e datas.
 - `triages`: execução de triagem, versão do ticket e da configuração, snapshot do relato e do alvo, classificação, justificativa, comportamento observado, regra esperada, fontes, incertezas, próxima ação, hashes de contexto e validade.
 - `ticket_events`: histórico imutável de estados, triagens, mensagens, complementações, contestações e decisões de implementação.
-- `deliveries`: vínculo entre implementação, branch, SHA e Merge Request.
+- `deliveries`: vínculo entre implementação, branch, SHA e Pull Request.
 - `executions`: tipo `triage|implementation`, pipeline, snapshots sem segredo, modo, estado, diagnóstico, rodada, SHAs e versão do Kiro.
 - `execution_events`: eventos públicos ordenados por sequência.
 - `artifacts`: referências a logs filtrados, diffs, relatórios e resultados de testes.
@@ -69,11 +69,11 @@ Snapshots, eventos e evidências não podem carregar credenciais, variáveis sec
 
 - Todo contrato de API é validado com Zod e exposto por tRPC.
 - O endpoint REST inicial é somente `GET /rest/health`.
-- Comandos de teste e integração usam executável, argumentos e `cwd` validados, com timeout e ambiente mínimo. O backend dispara a pipeline CI por uma integração HTTP configurada.
-- A triagem usa somente leitura e não cria branch, commit ou MR.
-- A pipeline usa o snapshot da triagem e da configuração do ticket; o Kiro executa dentro dela e não recebe credenciais do backend.
-- O relatório de negócio da pipeline/Kiro é JSON validado pelo backend; stdout sozinho não avança etapa.
-- Credenciais de disparo ficam somente no backend; credenciais Git e Kiro ficam somente no ambiente protegido da pipeline.
+- Comandos de teste e integração usam executável, argumentos e `cwd` validados, com timeout e ambiente mínimo. O backend usa o executável local `gh`, sem shell, para consultar o GitHub, iniciar workflows e criar ou reconciliar Pull Requests.
+- A triagem usa somente leitura e não cria branch, commit ou PR.
+- A execução usa o snapshot da triagem e da configuração do ticket; o Kiro executa com as permissões locais da fase e o `gh` usa somente a autenticação configurada na máquina da aplicação.
+- O relatório de negócio da execução/Kiro é JSON validado pelo backend; stdout sozinho não avança etapa.
+- Credenciais do GitHub ficam somente no ambiente local protegido da aplicação; tokens não entram no ticket, snapshot ou relatório.
 
 ## Fases do Kiro
 
@@ -92,7 +92,7 @@ Usar lock local e advisory lock PostgreSQL para impedir duas instâncias. Ao per
 
 ## Segurança e revisão
 
-Validar caminhos, permissões, segredos, diffs, limites e SHAs antes de publicar. Não usar force push, rebase automático, merge automático ou publicação sem evidência. Merge, deploy e alterações em dados de produção permanecem sob responsabilidade humana.
+Validar caminhos, permissões, segredos, diffs, SHAs e estado do Pull Request antes de publicar. Não usar force push, rebase automático, merge automático ou publicação sem evidência. Merge, deploy e alterações em dados de produção permanecem sob responsabilidade humana.
 
 ## Fontes detalhadas
 

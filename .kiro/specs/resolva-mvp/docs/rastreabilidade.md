@@ -31,24 +31,24 @@ Fonte normativa: [R01–R37/Q01–Q10](../requirements.md). Implementação: [ta
 | R25 | Todas as frentes pertinentes | Nenhum endpoint/adaptador oferece merge/deploy/escrita em dados de negócio |
 | Q01 | 1, 9, 20, 31 | `server.test.ts`; Host externo, Origin externo/nulo recusados; bind local |
 | Q02 | 1, 4, 20, 31 | Importação de tipos sem conexão; build frontend sem módulos/segredos do servidor |
-| Q03 | 26–29, 31 | Suíte sem conta Kiro/GitLab, com Testcontainers, pipeline falsa e adaptadores falsos |
+| Q03 | 26–29, 31 | Suíte sem conta Kiro/GitHub, com Testcontainers, pipeline falsa e adaptadores falsos |
 | Q04 | 20–24, 30–31 | Teclado, foco, erros e layouts 1366×768/390×844 |
 | Q05 | 12, 14, 25, 29–30 | Referência local/linhas/hash e versão de prompt ligadas ao diagnóstico |
-| Q06 | Gate 0, 25, 30–31 | Registro de ensaio com modelo/versão, pipeline, teste e MR real; mocks identificados |
+| Q06 | Gate 0, 25, 30–31 | Registro de ensaio com modelo/versão, pipeline, teste e PR real; mocks identificados |
 | Q07 | 32–37 | Contrato de triagem cobre cinco classificações e recusa fila para estados inválidos |
 | Q08 | 4–8, 13–15, 21–23, 26–28, 32–38 | Alteração do ticket ou da configuração torna `triageVersion` inválida |
 | Q09 | 2, 4, 7, 21, 24, 38 | Configuração validada, snapshot sem segredo e seleção no ticket |
-| Q10 | Gate 0, 14–19, 29, 31, 39–40 | Pipeline headless e MR vinculada ao ticket com CLI, modelo, SHA e resultado observáveis |
+| Q10 | Gate 0, 14–19, 29, 31, 39–40 | Pipeline headless e PR vinculada ao ticket com CLI, modelo, SHA e resultado observáveis |
 
 ## Cenários finais
 
 | Cenário | Tipo de verificação | Resultado esperado |
 | --- | --- | --- |
-| A — total por quantidade | Manual pipeline/GitLab real | `1500` antes, `2500` depois; teste vermelho/verde; SHA e MR confirmados |
-| B — informação insuficiente | Manual Kiro + teste de contrato | Perguntas objetivas, sem MR; complementar e iniciar nova tentativa preserva a anterior |
+| A — total por quantidade | Manual pipeline/GitHub real | `1500` antes, `2500` depois; teste vermelho/verde; SHA e PR confirmados |
+| B — informação insuficiente | Manual Kiro + teste de contrato | Perguntas objetivas, sem PR; complementar e iniciar nova tentativa preserva a anterior |
 | C — baseline quebrado | Integração local descartável | Bloqueio antes da IA, com motivo real |
-| D — ajuste de revisão | Contrato/fake e ensaio manual na MR de teste | Mesma MR/branch; behavior reproduz de novo, refinement conserva teste anterior |
-| E — publicação parcial | Fault injection com pipeline/GitLab falso | Checkpoint e consulta recuperam uma MR; sem criação duplicada |
+| D — ajuste de revisão | Contrato/fake e ensaio manual na PR de teste | Mesma PR/branch; behavior reproduz de novo, refinement conserva teste anterior |
+| E — publicação parcial | Fault injection com pipeline/GitHub falso | Checkpoint e consulta recuperam uma PR; sem criação duplicada |
 | F — reinício e morte do pai | Linux/PostgreSQL descartáveis; persistência também manual | Sem descendente vivo/trabalho concorrente; histórico recuperado; retry explícito |
 | G — conflito remoto | Bare Git temporário | Nenhum force push/sobrescrita; exige análise humana |
 | H — segredo fictício | Testes automatizados | Valor não persiste nem aparece em respostas; nenhum segredo real usado |
@@ -59,7 +59,7 @@ A duração do ensaio real não é SLA. Para apresentação, usar execução pre
 
 Na implementação, gerar um relatório com uma linha por requisito/cenário: ID, commit do Resolva, commit do alvo, ambiente/versões/modelo, comando/ação, início/fim, resultado observado, artefato filtrado/hash, responsável e limitação. Estados: `planejado`, `aprovado`, `falhou`, `bloqueado`, `não executado`.
 
-Testes com fakes não comprovam autenticação/disponibilidade externa. Registrar a MR real com URL/SHA e o vínculo à execução. Não preencher aprovado sem executar a verificação. A revisão documental deste pacote valida referências/cobertura de planejamento, não o comportamento do produto.
+Testes com fakes não comprovam autenticação/disponibilidade externa. Registrar a PR real com URL/SHA e o vínculo à execução. Não preencher aprovado sem executar a verificação. A revisão documental deste pacote valida referências/cobertura de planejamento, não o comportamento do produto.
 
 ## Requisitos de triagem e fila
 
@@ -75,8 +75,8 @@ Testes com fakes não comprovam autenticação/disponibilidade externa. Registra
 | R33 | 2, 4, 7, 21, 24, 38 | Ticket exige perfil ativo; criação/edição sem perfil não grava dados |
 | R34 | 2, 6–8, 13–16, 38–39 | Execução usa snapshot da configuração; comandos/caminhos livres do ticket são recusados |
 | R35 | 11–15, 28–29, 39 | Pipeline CI executa Kiro headless, relatório válido e limites; falha não publica |
-| R36 | 16–19, 29, 31, 40 | MR corresponde à configuração, branch, marcador, SHA validado e execução |
-| R37 | 2, 8–9, 14, 16, 23–24, 38–39 | Configuração ausente/inconsistente bloqueia sem branch, commit ou MR |
+| R36 | 16–19, 29, 31, 40 | PR corresponde à configuração, branch, marcador, SHA validado e execução |
+| R37 | 2, 8–9, 14, 16, 23–24, 38–39 | Configuração ausente/inconsistente bloqueia sem branch, commit ou PR |
 
 ## Cenários de triagem e elegibilidade
 

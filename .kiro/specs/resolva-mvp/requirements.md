@@ -2,7 +2,7 @@
 
 ## Contexto
 
-O Resolva recebe solicitações técnicas, realiza uma triagem baseada em evidências e, somente após decisão explícita do usuário, dispara uma pipeline de correção para o sistema-alvo configurado no ticket. A pipeline executa o Kiro CLI em modo headless, valida a alteração e abre uma Merge Request. Triagem, classificação, implementação e resultado de execução são conceitos distintos.
+O Resolva recebe solicitações técnicas, realiza uma triagem baseada em evidências e, somente após decisão explícita do usuário, usa o executável local `gh` para disparar um workflow de correção no GitHub Actions do sistema-alvo configurado no ticket. O workflow executa o Kiro CLI em modo headless, valida a alteração e abre uma Pull Request. Triagem, classificação, implementação e resultado de execução são conceitos distintos.
 
 Os requisitos ativos desta spec são a fonte de verdade para o MVP do Resolva.
 
@@ -24,9 +24,9 @@ Os requisitos ativos desta spec são a fonte de verdade para o MVP do Resolva.
 | R12 | QUANDO a implementação tratar um `bug`, O SISTEMA DEVE exigir uma asserção nova falhando antes da correção; QUANDO tratar uma `melhoria`, DEVE exigir escopo e critérios de aceite explícitos e testes do comportamento novo, sem fabricar uma falha do comportamento anterior. | Bug comprova teste vermelho/verde; melhoria comprova critérios e teste novo sem simular defeito. |
 | R13 | ENQUANTO implementar uma solução, O SISTEMA DEVE preservar testes existentes, testes de reprodução, caminhos e limites configurados. | Alteração de teste existente, suporte da suíte, arquivo fora do módulo ou diff excessivo bloqueia publicação. |
 | R14 | QUANDO a validação da implementação falhar, O SISTEMA DEVE enviar resultados ao Kiro até no máximo três rodadas de correção. | A terceira falha encerra com impedimento; não existe quarta rodada. |
-| R15 | QUANDO a solução for validada, O SISTEMA DEVE publicar somente o commit correspondente às evidências e confirmar uma Merge Request real no repositório do sistema-alvo antes de concluir. | SHA validado é igual ao publicado e a MR é consultável. |
-| R16 | QUANDO ocorrer repetição após publicação parcial, O SISTEMA DEVE reconciliar a pipeline, branch e MR existentes antes de criar recursos ou chamar nova IA. | Resposta perdida não gera MR duplicada nem nova implementação. |
-| R17 | QUANDO o operador solicitar ajuste de uma MR aberta, O SISTEMA DEVE registrar observação e tipo, exigir nova triagem quando o escopo ou regra mudar e permitir implementação elegível na mesma entrega. | Ajuste de comportamento preserva a classificação válida; mudança de regra exige nova análise e critérios. |
+| R15 | QUANDO a solução for validada, O SISTEMA DEVE publicar somente o commit correspondente às evidências e confirmar uma Pull Request real no repositório do sistema-alvo antes de concluir. | SHA validado é igual ao publicado e a PR é consultável. |
+| R16 | QUANDO ocorrer repetição após publicação parcial, O SISTEMA DEVE reconciliar a workflow do GitHub Actions, branch e PR existentes antes de criar recursos ou chamar nova IA. | Resposta perdida não gera PR duplicada nem nova implementação. |
+| R17 | QUANDO o operador solicitar ajuste de uma PR aberta, O SISTEMA DEVE registrar observação e tipo, exigir nova triagem quando o escopo ou regra mudar e permitir implementação elegível na mesma entrega. | Ajuste de comportamento preserva a classificação válida; mudança de regra exige nova análise e critérios. |
 | R18 | QUANDO uma branch tiver mudança remota não reconhecida, O SISTEMA DEVE interromper a atualização e apresentar conflito para análise humana. | SHA divergente não sofre force push nem sobrescrita. |
 | R19 | QUANDO o operador confirmar merge e verificação em teste, O SISTEMA DEVE marcar o ticket como `resolvido` e registrar a confirmação. | Ambos os indicadores são obrigatórios; abrir PR não resolve. |
 | R20 | QUANDO o operador reabrir ticket resolvido, O SISTEMA DEVE exigir justificativa, invalidar a elegibilidade anterior e preservar entregas e execuções anteriores. | Nova triagem e nova implementação usam histórico preservado. |
@@ -43,18 +43,18 @@ Os requisitos ativos desta spec são a fonte de verdade para o MVP do Resolva.
 | R31 | QUANDO o usuário contestar uma recusa, complementar evidências ou solicitar nova triagem, O SISTEMA DEVE preservar a conclusão anterior, registrar a contestação e criar uma nova triagem vinculada à nova versão ou intenção. | Histórico mostra conclusões em sequência; a nova triagem não sobrescreve a anterior. |
 | R32 | QUANDO o relato, comportamento esperado, regra ou evidência analisada mudar de forma relevante, O SISTEMA DEVE invalidar a triagem anterior e exigir nova triagem antes da implementação. | `triageVersion`/hashes não correspondem ao ticket atual; início manual é recusado. |
 | R33 | QUANDO o operador cadastrar ou editar um ticket, O SISTEMA DEVE exigir a seleção de uma configuração de sistema-alvo previamente validada, persistindo sua versão vinculada ao ticket. | Ticket sem configuração ou configuração inválida retorna `BAD_REQUEST`/`PRECONDITION_FAILED`; o ticket recuperado mantém o mesmo alvo e versão. |
-| R34 | QUANDO uma implementação for iniciada, O SISTEMA DEVE usar exclusivamente o snapshot validado da configuração vinculada ao ticket para determinar repositório, branch base, pipeline, caminhos, comandos, testes e modelo, sem aceitar esses valores do relato. | Alteração da configuração após a triagem bloqueia o início; a execução registra o snapshot usado. |
-| R35 | QUANDO o usuário iniciar uma implementação elegível, O SISTEMA DEVE disparar uma pipeline CI configurada, que executará o Kiro CLI headless com modelo explícito, timeout, ambiente mínimo e relatório de resultado validado. | Pipeline ausente, execução interativa, relatório inválido ou saída fora do limite bloqueia a implementação sem publicar alterações. |
-| R36 | QUANDO a pipeline validar a implementação e produzir um SHA aprovado, O SISTEMA DEVE criar ou atualizar uma Merge Request no GitLab do sistema configurado no ticket e associá-la à execução e à entrega. | A MR contém branch, SHA, testes, escopo e limitações; callback repetido não cria outra MR. |
-| R37 | QUANDO a configuração do sistema-alvo estiver indisponível, inconsistente ou sem credenciais operacionais necessárias, O SISTEMA DEVE bloquear a execução dependente dela e manter o ticket, histórico e triagem consultáveis. | O bloqueio informa a configuração ausente ou inválida sem expor segredos e sem criar branch, commit ou MR. |
+| R34 | QUANDO uma implementação for iniciada, O SISTEMA DEVE usar exclusivamente o snapshot validado da configuração vinculada ao ticket para determinar repositório, branch base, workflow do GitHub Actions, caminhos, comandos, testes e modelo, sem aceitar esses valores do relato. | Alteração da configuração após a triagem bloqueia o início; a execução registra o snapshot usado. |
+| R35 | QUANDO o usuário iniciar uma implementação elegível, O SISTEMA DEVE disparar uma workflow do GitHub Actions CI configurada, que executará o Kiro CLI headless com modelo explícito, timeout, ambiente mínimo e relatório de resultado validado. | Pipeline ausente, execução interativa, relatório inválido ou saída fora do limite bloqueia a implementação sem publicar alterações. |
+| R36 | QUANDO a workflow do GitHub Actions validar a implementação e produzir um SHA aprovado, O SISTEMA DEVE criar ou atualizar uma Pull Request no GitHub do sistema configurado no ticket e associá-la à execução e à entrega. | A PR contém branch, SHA, testes, escopo e limitações; callback repetido não cria outra PR. |
+| R37 | QUANDO a configuração do sistema-alvo estiver indisponível, inconsistente ou sem credenciais operacionais necessárias, O SISTEMA DEVE bloquear a execução dependente dela e manter o ticket, histórico e triagem consultáveis. | O bloqueio informa a configuração ausente ou inválida sem expor segredos e sem criar branch, commit ou PR. |
 
 ## Requisitos adicionais: sistema-alvo por ticket
 
-O ticket seleciona a configuração do sistema-alvo previamente validada. Essa configuração define repositório, pipeline e limites operacionais, mas não pode ser preenchida com comandos arbitrários, segredos ou caminhos livres pelo relato do usuário. A seleção da configuração é parte da intenção do ticket e, quando alterada de forma relevante, invalida a triagem e a elegibilidade da implementação.
+O ticket seleciona a configuração do sistema-alvo previamente validada. Essa configuração define repositório, workflow do GitHub Actions e limites operacionais, mas não pode ser preenchida com comandos arbitrários, segredos ou caminhos livres pelo relato do usuário. A seleção da configuração é parte da intenção do ticket e, quando alterada de forma relevante, invalida a triagem e a elegibilidade da implementação.
 
-O MVP usa uma única configuração de sistema-alvo por instalação, selecionada no ticket por uma chave validada. Não haverá catálogo administrativo, múltiplos provedores, múltiplas pipelines ou configuração de comandos pelo usuário. A configuração fixa o repositório GitLab, branch base, pipeline, caminhos permitidos e limites.
+O MVP usa uma única configuração de sistema-alvo por instalação, selecionada no ticket por uma chave validada. Não haverá catálogo administrativo, múltiplos provedores, múltiplas workflow do GitHub Actionss ou configuração de comandos pelo usuário. A configuração fixa o repositório GitHub, branch base, workflow do GitHub Actions, caminhos permitidos e limites.
 
-Os requisitos R01–R37 permanecem normativos. R33–R37 detalham o vínculo entre ticket, configuração do sistema-alvo, pipeline CI, Kiro CLI headless e Merge Request.
+Os requisitos R01–R37 permanecem normativos. R33–R37 detalham o vínculo entre ticket, configuração do sistema-alvo, workflow do GitHub Actions CI, Kiro CLI headless e Pull Request.
 
 - Tickets: `aberto`, `em_triagem`, `recusado`, `aguardando_informacoes`, `aguardando_implementacao`, `em_andamento`, `aguardando_revisao`, `resolvido`.
 - Execuções de triagem: `em_andamento`, `bloqueada`, `concluida`, `falhou`, `interrompida`.
@@ -75,7 +75,7 @@ Os requisitos R01–R37 permanecem normativos. R33–R37 detalham o vínculo ent
 - Contestar uma recusa e executar nova triagem preservando o histórico.
 - Alterar o ticket ou a configuração do sistema-alvo e invalidar a triagem anterior.
 - Demonstrar o início manual da correção no sistema configurado pelo ticket.
-- Demonstrar a criação ou atualização de uma Merge Request vinculada ao ticket após validação.
+- Demonstrar a criação ou atualização de uma Pull Request vinculada ao ticket após validação.
 - Confirmar merge e verificação em teste manualmente antes de resolver o ticket.
 
 ## Fora do escopo
@@ -103,14 +103,14 @@ Estes itens detalham condições operacionais do mesmo MVP; não substituem nem 
 | --- | --- | --- |
 | Q01 | O SISTEMA DEVE manter frontend/API em loopback e validar Host/Origin locais, sem CORS irrestrito. | Host externo e Origin externo/nulo recusados; origem local configurada aceita |
 | Q02 | QUANDO frontend importar contratos, O SISTEMA DEVE exportar apenas tipos públicos sem iniciar conexão nem incluir segredos no bundle. | Verificação de tipos/build e importação sem efeitos colaterais |
-| Q03 | QUANDO testes automatizados executarem, O SISTEMA DEVE usar fakes/recursos descartáveis sem modelo pago, pipeline real ou MR real. | Suíte funciona sem credenciais Kiro/GitLab; integração não toca banco da demonstração |
+| Q03 | QUANDO testes automatizados executarem, O SISTEMA DEVE usar fakes/recursos descartáveis sem modelo pago, workflow do GitHub Actions real ou PR real. | Suíte funciona sem credenciais Kiro/GitHub; integração não toca banco da demonstração |
 | Q04 | QUANDO operador navegar, O SISTEMA DEVE oferecer rótulos, foco, teclado e estados de erro recuperáveis nas telas. | Ensaios em 1366×768/390×844 e erro de rede sem spinner indefinido |
 | Q05 | QUANDO o agente referenciar contexto, O SISTEMA DEVE validar referências locais e registrar versões/hashes de fontes e prompts. | Caminho/linhas existentes e correlação com diagnóstico; sem contexto bruto ou raciocínio interno |
 | Q06 | QUANDO o piloto for apresentado, A EQUIPE DEVE distinguir evidência real de integração falsa e declarar pendências. | Registro de versão/modelo, teste vermelho/verde e PR consultado; mocks identificados |
 | Q07 | QUANDO a triagem concluir, O SISTEMA DEVE persistir classificação, mensagem, fontes, incertezas e próxima ação sem permitir implementação fora da elegibilidade. | Contrato de triagem cobre as cinco classificações e recusa a fila para estados inválidos |
 | Q08 | QUANDO uma triagem estiver desatualizada, O SISTEMA DEVE impedir implementação e explicar a versão que exige nova análise. | Alteração do ticket/regra/evidência torna `triageVersion` inválida |
 | Q09 | QUANDO um ticket for criado ou alterado, O SISTEMA DEVE vincular um perfil de sistema-alvo validado, sem persistir segredo nem comando livre. | Perfil inexistente/inativo é recusado; o snapshot do perfil pode ser auditado sem credenciais |
-| Q10 | QUANDO o Resolva disparar uma correção, O SISTEMA DEVE disparar a pipeline CI configurada e associar sua execução à MR do sistema-alvo do ticket. | Eventos registram pipeline, modelo, SHA e MR; testes automatizados não usam pipeline real. |
+| Q10 | QUANDO o Resolva disparar uma correção, O SISTEMA DEVE disparar a workflow do GitHub Actions CI configurada e associar sua execução à PR do sistema-alvo do ticket. | Eventos registram workflow do GitHub Actions, modelo, SHA e PR; testes automatizados não usam workflow do GitHub Actions real. |
 
 ### Exemplo de aceitação escrito para R19
 

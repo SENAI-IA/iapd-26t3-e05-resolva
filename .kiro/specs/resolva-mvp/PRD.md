@@ -8,11 +8,11 @@
 
 O Resolva recebe solicitações técnicas que podem representar defeitos, mudanças de regra ou interpretações incorretas. Antes de alterar código, a plataforma confronta o relato com comportamento esperado, regras de negócio, documentação, código e evidências disponíveis. Uma triagem persistida explica a conclusão e encaminha o ticket para recusa, esclarecimento ou implementação manual.
 
-Na implementação, o backend dispara uma pipeline CI para o sistema-alvo configurado no ticket. A pipeline executa o Kiro CLI em modo headless, altera uma cópia controlada do repositório, roda os testes e abre uma Merge Request. O backend acompanha o resultado e vincula a MR ao ticket.
+Na implementação, o backend usa o executável local `gh` para disparar o workflow do GitHub Actions do sistema-alvo configurado no ticket. O workflow executa o Kiro CLI em modo headless, altera uma cópia controlada do repositório, roda os testes e abre uma Pull Request. O backend acompanha o resultado e vincula a PR ao ticket.
 
 **Hipótese de valor:** para equipes de engenharia que tratam defeitos pequenos em módulos conhecidos, o fluxo pode reduzir o tempo até a primeira correção revisável sem sacrificar evidências, controle de escopo ou aprovação humana.
 
-**Hipótese comercial:** uma operação local ou privada, com integração controlada ao GitLab CI, pode atender equipes que precisam aumentar a capacidade de manutenção sem entregar autonomia irrestrita a um agente.
+**Hipótese comercial:** uma operação local ou privada, com integração controlada ao GitHub CI, pode atender equipes que precisam aumentar a capacidade de manutenção sem entregar autonomia irrestrita a um agente.
 
 ## 2. Público e responsabilidades
 
@@ -34,7 +34,7 @@ O produto pode operar sem login no MVP local. Em uma implantação compartilhada
 3. Explicar a triagem no próprio ticket e encaminhar recusas, dúvidas, bugs e melhorias corretamente.
 4. Manter bugs e melhorias em fila persistida, com início de implementação exclusivamente manual.
 5. Comprovar bugs com teste novo falhando antes da correção e validar melhorias por escopo, critérios e testes do comportamento novo.
-6. Criar ou atualizar somente a Merge Request associada ao commit validado no repositório do sistema configurado no ticket e confirmar sua identidade antes de concluir.
+6. Criar ou atualizar somente a Pull Request associada ao commit validado no repositório do sistema configurado no ticket e confirmar sua identidade antes de concluir.
 7. Preservar contestação, complementação, reavaliação, histórico e controle de versão sem inventar resultados.
 
 ## 4. Escopo e prioridades
@@ -46,11 +46,11 @@ P0 e P1 fazem parte do MVP completo R01–R37. A prioridade estabelece sequênci
 | P0 | Triagem fundamentada | Classificação, mensagem persistida, fontes e próxima ação |
 | P0 | Fila manual de implementação | Bugs e melhorias elegíveis aguardam decisão explícita |
 | P0 | Elegibilidade e validade | Versão do ticket, triagem, critérios e configuração conferidos |
-| P0 | Configuração do sistema-alvo | Um sistema GitLab, branch base, pipeline e limites definidos no arquivo de configuração |
-| P0 | Kiro CLI headless via pipeline | Correção executada fora do processo web, com resultado acompanhado |
-| P0 | Merge Request vinculada ao ticket | MR, branch, commit e SHA associados à execução |
+| P0 | Configuração do sistema-alvo | Um sistema GitHub, branch base, workflow do GitHub Actions e limites definidos no arquivo de configuração |
+| P0 | Kiro CLI headless via workflow do GitHub Actions | Correção executada fora do processo web, com resultado acompanhado |
+| P0 | Pull Request vinculada ao ticket | PR, branch, commit e SHA associados à execução |
 | P0 | Validação determinística | Baseline, reprodução ou critérios de melhoria e suíte validada |
-| P0 | GitLab CI | Pipeline, branch, commit e MR reais; SHA confirmado; sem duplicação |
+| P0 | GitHub CI | Pipeline, branch, commit e PR reais; SHA confirmado; sem duplicação |
 | P0 | Acompanhamento visual | Classificação, fila, eventos, testes e impedimentos recuperáveis |
 | P0 | Recuperação e proteção | Encerrar processos, preservar testes e bloquear publicação insegura |
 | P1 | Contestação e nova triagem | Conclusões anteriores preservadas e nova versão analisada |
@@ -74,8 +74,8 @@ O PostgreSQL do Resolva guarda tickets e evidências do próprio produto. A idei
 | Item | Situação | Efeito |
 | --- | --- | --- |
 | Stack, Kiro CLI headless e uma execução local | Definidos nos steerings atuais | Preservados |
-| Configuração do sistema-alvo | Decisão desta revisão | Uma configuração GitLab/CI por instalação; ticket seleciona a chave validada |
-| Pipeline, conta/modelo Kiro e GitLab | Pendentes | Fluxo real condicionado ao ensaio de compatibilidade |
+| Configuração do sistema-alvo | Decisão desta revisão | Uma configuração GitHub/CI por instalação; ticket seleciona a chave validada |
+| Pipeline, conta/modelo Kiro e GitHub | Pendentes | Fluxo real condicionado ao ensaio de compatibilidade |
 | Host Linux | Proposta operacional para controlar descendentes | Outras plataformas exigem validação adicional |
 | Perfis separados do Resolva | Exigidos no design atual | Executor trabalha em cópia controlada do repositório do perfil e nunca modifica o próprio Resolva |
 | Capacidade de operação | Ainda não medida | Confirmar competências, disponibilidade e modelo de suporte |
@@ -86,7 +86,7 @@ O PostgreSQL do Resolva guarda tickets e evidências do próprio produto. A idei
 
 O operador informa a chave do sistema-alvo configurado, título, relato, comportamento esperado, categoria e passos quando disponíveis. O backend valida a configuração e cria o ticket `aberto`, versão 1, com código `RES-<id>` e snapshot da configuração. A ação `Analisar ticket` reserva uma execução de triagem, captura o snapshot e muda o ticket para `em_triagem` na mesma transação.
 
-A triagem consulta o relato, comportamento esperado, regras de negócio, documentação e código dentro dos caminhos autorizados pela configuração selecionada. Ela é executada pelo Kiro CLI em modo headless dentro da pipeline, não edita código durante a triagem, não cria branch ou MR e não inicia implementação.
+A triagem consulta o relato, comportamento esperado, regras de negócio, documentação e código dentro dos caminhos autorizados pela configuração selecionada. Ela é executada pelo Kiro CLI em modo headless dentro da workflow do GitHub Actions, não edita código durante a triagem, não cria branch ou PR e não inicia implementação.
 
 Toda conclusão persiste no próprio ticket: classificação, justificativa, comportamento observado, comportamento esperado pelas regras, fontes consultadas, evidências verificáveis, incertezas e próxima ação. `falso_positivo` e `entendimento_incorreto` recusam a implementação. `bug` e `melhoria` entram em `aguardando_implementacao`. `inconclusivo` aguarda informação ou revisão.
 
@@ -94,7 +94,7 @@ Toda conclusão persiste no próprio ticket: classificação, justificativa, com
 
 A fila é persistida e mostra bugs e melhorias com triagem válida, escopo, critérios e sistema-alvo configurado. Ela não é consumida por worker. O usuário escolhe `Iniciar implementação`; o backend confere classificação, versão do ticket, validade da triagem, configuração, critérios e exclusividade global. Cadastro, análise, complementação ou classificação nunca iniciam implementação automaticamente.
 
-O backend dispara a pipeline CI com o snapshot do ticket e da configuração. A pipeline executa o Kiro CLI headless, prepara o sistema, roda os testes e abre uma Merge Request. Para `bug`, exige teste novo falhando antes da correção. Para `melhoria`, valida o comportamento novo sem fabricar uma falha no comportamento anterior.
+O backend dispara a workflow do GitHub Actions CI com o snapshot do ticket e da configuração. A workflow do GitHub Actions executa o Kiro CLI headless, prepara o sistema, roda os testes e abre uma Pull Request. Para `bug`, exige teste novo falhando antes da correção. Para `melhoria`, valida o comportamento novo sem fabricar uma falha no comportamento anterior.
 
 ### 6.3 Informação, contestação e falhas
 
@@ -157,6 +157,6 @@ Primeiro marco: ensaio curto de headless/permissões/autenticação/testes/PR. D
 
 Estimativa inicial: **320 pessoas-hora + 75 de reserva = 395**, com premissas detalhadas na [viabilidade](docs/viabilidade.md). Não é compromisso de prazo. Confirmar capacidade, orçamento, configuração, modelo e critérios de sucesso antes de comprometer uma entrega.
 
-**Definição de pronto do produto:** R01–R37 verificados, configuração do sistema-alvo selecionada no ticket, triagem e fila manual comprovadas, testes relevantes aprovados, fluxo real Kiro CLI headless/GitLab CI registrado, Merge Request vinculada e revisão humana. Documentação concluída não significa produto executável concluído.
+**Definição de pronto do produto:** R01–R37 verificados, configuração do sistema-alvo selecionada no ticket, triagem e fila manual comprovadas, testes relevantes aprovados, fluxo real Kiro CLI headless/GitHub CI registrado, Pull Request vinculada e revisão humana. Documentação concluída não significa produto executável concluído.
 
 **Confiança: média.** Há suporte documental para a arquitetura e integração; faltam ensaio autenticado, capacidade operacional, métricas de produtividade, custo de operação e validação de mercado.

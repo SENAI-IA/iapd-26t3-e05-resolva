@@ -52,7 +52,7 @@ design e R09–R12/R26–R32. O cadastro existente permanece na branch
 - RED: 31 falhas de comportamento em classificação/elegibilidade com funções
   sem regras; 10 falhas nas transições antes de acrescentar as ações.
 - GREEN: 95 novos testes de domínio passando (64 de classificação/validade/
-  elegibilidade e 31 de transições). Nenhum deles usa conta de IA ou GitLab.
+  elegibilidade e 31 de transições). Nenhum deles usa conta de IA ou GitHub.
 - `pnpm check`: tipos, lint, formatação, 194 unitários e builds backend/web
   aprovados. Web continua estático, sem testes próprios de comportamento.
 - `pnpm test:integration`: 31 casos aprovados em três suítes com PostgreSQL
@@ -63,7 +63,7 @@ design e R09–R12/R26–R32. O cadastro existente permanece na branch
   críticos, importantes ou menores. A recomendação sobre versão da resolução
   foi incorporada acima.
 - Final: Ruling: verificação real de fontes, reservas e snapshots, idempotência,
-  fila/API, pipeline CI, GitLab e interface não foram julgados como implementados
+  fila/API, pipeline CI, GitHub e interface não foram julgados como implementados
   nesta revisão — continuam tarefas explícitas posteriores; os testes locais
   não comprovam operação autenticada. O risco de integração futura deve ser
   coberto junto a cada adaptador e transação, sem enfraquecer o domínio.

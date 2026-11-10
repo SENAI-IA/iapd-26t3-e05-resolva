@@ -26,7 +26,7 @@ A base examinada concentra a documentação ativa em `.kiro/`. Requisitos comerc
 | --- | --- | --- |
 | Problema de negócio | Favorável | Defeitos pequenos e repetitivos geram demanda recorrente por triagem e correção |
 | Produto | Favorável com escopo controlado | Caso real verificável, revisão humana e tratamento explícito de impedimentos |
-| Tecnologia | Favorável com risco moderado/alto de integração | Ensaio de Kiro CLI headless/GitLab CI/MR antes da expansão do produto |
+| Tecnologia | Favorável com risco moderado/alto de integração | Ensaio de Kiro CLI headless/GitHub CI/PR antes da expansão do produto |
 | Operação | Favorável em ambiente local ou privado | Perfis de sistema-alvo previamente configurados, isolamento e ausência de dados de produção |
 | Prazo | Indeterminado | Confirmar capacidade e medir o primeiro marco |
 | Financeiro | Não quantificado | Medir consumo de IA, infraestrutura, suporte e retrabalho |
@@ -39,7 +39,7 @@ O Resolva atende inicialmente equipes de engenharia que mantêm aplicações em 
 
 A proposta comercial depende de quatro provas: redução mensurável do tempo de correção, qualidade das mudanças comparável ao fluxo humano, custo previsível de IA e operação segura em ambientes controlados. O primeiro piloto deve medir essas dimensões com um projeto-alvo separado, sem confundir documentação de intenção com resultado de produto.
 
-O MVP começa como operação local ou privada para um projeto confiável. Uma versão compartilhada exigirá autenticação, autorização por projeto, isolamento de workspaces, auditoria, limites de consumo, retenção de evidências e suporte operacional. Integrações com outros provedores de IA, GitLab e Azure DevOps podem ampliar o mercado depois da validação do fluxo principal.
+O MVP começa como operação local ou privada para um projeto confiável. Uma versão compartilhada exigirá autenticação, autorização por projeto, isolamento de workspaces, auditoria, limites de consumo, retenção de evidências e suporte operacional. Integrações com outros provedores de IA, GitHub e Azure DevOps podem ampliar o mercado depois da validação do fluxo principal.
 
 A receita pode ser validada por uma combinação de assinatura por workspace, cobrança por execução ou contrato privado com suporte. A escolha depende de entrevistas com clientes, custo real por execução e frequência de uso; nenhum modelo de preço está definido nesta fase.
 
@@ -47,8 +47,8 @@ A receita pode ser validada por uma combinação de assinatura por workspace, co
 
 | Abordagem | Vantagem | Custo/limite | Recomendação |
 | --- | --- | --- | --- |
-| Pipeline CI + Merge Request | Limite claro entre o Resolva e o sistema-alvo | Depende de callback, credenciais e reconciliação | Manter no MVP |
-| CLI + relatório + MR | Menos interface e esforço | Muda o objetivo visual | Redução de escopo possível, mediante decisão |
+| Pipeline CI + Pull Request | Limite claro entre o Resolva e o sistema-alvo | Depende de callback, credenciais e reconciliação | Manter no MVP |
+| CLI + relatório + PR | Menos interface e esforço | Muda o objetivo visual | Redução de escopo possível, mediante decisão |
 | Agente próprio por API | Controle fino das ferramentas | Aumenta implementação e avaliação | Adiar |
 
 Manter TypeScript já escolhido. Um alvo Java/JUnit pode ser evolução, mas a compatibilidade não está incluída no primeiro adaptador Vitest JSON. Não inferir suporte a um sistema como SGN3 a partir de um piloto pequeno.
@@ -69,7 +69,7 @@ Trabalho futuro, sem aplicação completa. Lucas/Sergio são donos propostos.
 
 ## 6. Estimativa por pacote
 
-Pacotes são agrupamentos das tarefas atuais, não novas specs concorrentes. A inclusão da configuração única por ticket e do fluxo pipeline CI/Kiro headless/MR deve ser considerada no esforço de integração.
+Pacotes são agrupamentos das tarefas atuais, não novas specs concorrentes. A inclusão da configuração única por ticket e do fluxo pipeline CI/Kiro headless/PR deve ser considerada no esforço de integração.
 
 | Pacote | Pessoas-hora de referência |
 | --- | ---: |
@@ -78,7 +78,7 @@ Pacotes são agrupamentos das tarefas atuais, não novas specs concorrentes. A i
 | P02 — tickets, triagem e API | 48 |
 | P03 — executor, validação, recuperação e orquestração | 56 |
 | P04 — pipeline CI/Kiro, contexto e relatórios | 44 |
-| P05 — GitLab/MR e reconciliação | 36 |
+| P05 — GitHub/PR e reconciliação | 36 |
 | P06 — interface, fila e operação | 48 |
 | P07 — QA, piloto e operação | 36 |
 | **Subtotal** | **300** |

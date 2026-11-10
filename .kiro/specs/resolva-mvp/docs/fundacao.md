@@ -19,7 +19,7 @@ com o servidor mínimo da tarefa 9. Referência: `../design.md` e `../tasks.md`.
 
 - O plano de produto existente orienta esta entrega; não há alteração de arquitetura.
 - O healthcheck informa somente a disponibilidade HTTP, sem afirmar prontidão de
-  banco, GitLab CI ou Kiro. Essas verificações pertencem às próximas tarefas.
+  banco, GitHub CI ou Kiro. Essas verificações pertencem às próximas tarefas.
 - A interface inicial é apenas a entrada do aplicativo, sem dados ou ações simuladas.
 - A validação completa da configuração (tarefa 2), persistência (4) e tickets (5–8)
   permanecem pendentes. Esta entrega não usa IA nem publica PRs no projeto-alvo.

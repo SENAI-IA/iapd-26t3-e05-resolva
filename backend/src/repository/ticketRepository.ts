@@ -43,7 +43,7 @@ const selection = {
   triage: { status: triages.status, ticketVersion: triages.ticketVersion },
 };
 
-function toTicket(
+export function toTicket(
   row: typeof tickets.$inferSelect,
   triage: Pick<typeof triages.$inferSelect, "status" | "ticketVersion"> | null = null,
 ): Ticket {

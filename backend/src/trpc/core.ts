@@ -2,10 +2,12 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { DomainError } from "../domain/error.js";
 import type { TicketService } from "../services/ticketService.js";
 import type { TriageService } from "../services/triageService.js";
+import type { ImplementationService } from "../services/implementationService.js";
 
 export interface TRPCContext {
   tickets: TicketService | null;
   triages: TriageService | null;
+  implementations: ImplementationService | null;
 }
 
 const publicMessages: Record<string, string> = {
@@ -52,4 +54,9 @@ export const ticketProcedure = procedure.use(({ ctx, next }) => {
 export const triageProcedure = procedure.use(({ ctx, next }) => {
   if (!ctx.triages) throw new TRPCError({ code: "PRECONDITION_FAILED" });
   return next({ ctx: { triages: ctx.triages } });
+});
+
+export const implementationProcedure = procedure.use(({ ctx, next }) => {
+  if (!ctx.implementations) throw new TRPCError({ code: "PRECONDITION_FAILED" });
+  return next({ ctx: { implementations: ctx.implementations } });
 });

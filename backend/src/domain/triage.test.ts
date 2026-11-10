@@ -272,6 +272,16 @@ describe("elegibilidade para início manual", () => {
     });
   });
 
+  it("informa pré-condição de ambiente antes de verificar fontes quando o ambiente não está pronto", () => {
+    expect(
+      canStartImplementation(ticket, triage, {
+        ready: false,
+        activeExecutionId: null,
+        sourceHashes: {},
+      }),
+    ).toMatchObject({ eligible: false, code: "PRECONDITION_FAILED" });
+  });
+
   it("informa a execução ativa global, inclusive quando ela é uma triagem", () => {
     expect(
       canStartImplementation(ticket, triage, { ...environment, activeExecutionId: triageId }),

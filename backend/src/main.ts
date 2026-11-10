@@ -7,9 +7,11 @@ import { createDatabase, type AppDatabase } from "./db/index.js";
 import { defaultCategories } from "./domain/contracts.js";
 import { createTicketRepository } from "./repository/ticketRepository.js";
 import { createTriageRepository } from "./repository/triageRepository.js";
+import { createImplementationRepository } from "./repository/implementationRepository.js";
 import { createServer } from "./server.js";
 import { createTicketService } from "./services/ticketService.js";
 import { createTriageService } from "./services/triageService.js";
+import { createImplementationService } from "./services/implementationService.js";
 
 let server: ReturnType<typeof createServer> | undefined;
 let database: AppDatabase | undefined;
@@ -63,6 +65,10 @@ try {
             targetConfig,
           ),
           triageService: createTriageService(createTriageRepository(database)),
+          implementationService: createImplementationService(
+            createImplementationRepository(database),
+            { ready: false, sourceHashes: {} },
+          ),
         }
       : {},
   );

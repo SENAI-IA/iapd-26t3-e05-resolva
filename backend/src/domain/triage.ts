@@ -103,6 +103,13 @@ export function canStartImplementation(
       message: "Analise o ticket antes de iniciar a implementação.",
     };
   }
+  if (!environment.ready) {
+    return {
+      eligible: false,
+      code: "PRECONDITION_FAILED",
+      message: "Configure e valide o ambiente de implementação antes de iniciar.",
+    };
+  }
   if (!isTriageValid(triage, ticket, environment.sourceHashes)) {
     return {
       eligible: false,
@@ -129,13 +136,6 @@ export function canStartImplementation(
       code: "CRITERIA_REQUIRED",
       message:
         "Complete o plano de testes e, para melhorias, o escopo e os critérios de aceite na triagem.",
-    };
-  }
-  if (!environment.ready) {
-    return {
-      eligible: false,
-      code: "PRECONDITION_FAILED",
-      message: "Configure e valide o ambiente de implementação antes de iniciar.",
     };
   }
   if (environment.activeExecutionId) {

@@ -4,9 +4,14 @@ import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { appRouter } from "./trpc/router.js";
 import type { TicketService } from "./services/ticketService.js";
 import type { TriageService } from "./services/triageService.js";
+import type { ImplementationService } from "./services/implementationService.js";
 
 export function createServer(
-  options: { ticketService?: TicketService; triageService?: TriageService } = {},
+  options: {
+    ticketService?: TicketService;
+    triageService?: TriageService;
+    implementationService?: ImplementationService;
+  } = {},
 ) {
   const allowedHosts = new Set([
     "127.0.0.1:3000",
@@ -71,6 +76,7 @@ export function createServer(
       createContext: () => ({
         tickets: options.ticketService ?? null,
         triages: options.triageService ?? null,
+        implementations: options.implementationService ?? null,
       }),
     },
   });

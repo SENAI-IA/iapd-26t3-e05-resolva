@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  implementationListInputSchema,
   implementationQueueInputSchema,
   startImplementationSchema,
 } from "../domain/implementationContracts.js";
@@ -49,7 +50,7 @@ async function eligibleTicket() {
   );
   await resource.database.pool.query(
     `INSERT INTO triages(id,ticket_id,execution_id,ticket_version,ticket_snapshot,classification,summary,observed_behavior,expected_behavior,rule_interpretation,diagnosis,next_action,change_scope,acceptance_criteria,regression_test_plan,prompt_version,source_hashes)
-     VALUES ($1,$2,$3,1,'{}','bug','Resumo','Observado','Esperado','Regra','Diagnóstico','Próxima ação',NULL,'{}','Executar a regressão','v1',$4)`,
+     VALUES ($1,$2,$3,1,'{}','bug','Resumo','Observado','Esperado','Regra','Diagnóstico','Próxima ação',NULL,'[]','Executar a regressão','v1',$4)`,
     [triageId, ticket.id, executionId, JSON.stringify({ [sourcePath]: sourceHash })],
   );
   await resource.database.pool.query(
@@ -95,6 +96,26 @@ describe("implementação transacional", () => {
       [ticketId],
     );
     expect(events.rows.at(-1)?.type).toBe("implementation_started");
+  });
+
+  it("lista a execução e consulta o detalhe sem expor snapshots internos", async () => {
+    const ticketId = await eligibleTicket();
+    const input = startImplementationSchema.parse({
+      ticketId,
+      expectedVersion: 1,
+      requestKey: randomUUID(),
+    });
+    const reservation = await repository.reserve(input, environment);
+    const list = await repository.list(implementationListInputSchema.parse({ ticketId }));
+    expect(list).toMatchObject({ total: 1, items: [{ execution: { id: reservation.id } }] });
+    const detail = await repository.byId(reservation.id);
+    expect(detail).toMatchObject({
+      execution: { id: reservation.id, status: "em_andamento", triageId: expect.any(String) },
+      ticket: { id: ticketId, status: "em_andamento" },
+      triage: { classification: "bug", regressionTestPlan: "Executar a regressão" },
+      delivery: null,
+    });
+    expect(JSON.stringify(detail)).not.toContain("ticket_snapshot");
   });
 
   it("reproduz a mesma reserva pela requestKey sem criar outra execução", async () => {

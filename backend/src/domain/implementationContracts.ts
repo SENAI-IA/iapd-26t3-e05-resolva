@@ -36,3 +36,73 @@ export const startImplementationResultSchema = z.strictObject({
   implementationExecutionId: z.uuid(),
 });
 export type StartImplementationResult = z.infer<typeof startImplementationResultSchema>;
+
+const executionStatusSchema = z.enum([
+  "em_andamento",
+  "bloqueada",
+  "falhou",
+  "concluida",
+  "interrompida",
+]);
+const executionModeSchema = z.enum(["initial", "retry", "review_behavior", "review_refinement"]);
+const isoDate = z.iso.datetime();
+
+export const implementationExecutionSchema = z.strictObject({
+  id: z.uuid(),
+  ticketId: z.number().int().positive(),
+  ticketVersion: z.number().int().positive(),
+  triageId: z.uuid().nullable(),
+  status: executionStatusSchema,
+  stage: z.string().nullable(),
+  mode: executionModeSchema.nullable(),
+  round: z.number().int().nonnegative().max(3),
+  outcome: z.string().nullable(),
+  startedAt: isoDate,
+  completedAt: isoDate.nullable(),
+});
+export type ImplementationExecution = z.infer<typeof implementationExecutionSchema>;
+
+export const implementationListItemSchema = z.strictObject({
+  execution: implementationExecutionSchema,
+  ticket: ticketSchema,
+});
+export const implementationListInputSchema = paginationSchema.extend({
+  ticketId: z.number().int().positive().optional(),
+  status: executionStatusSchema.optional(),
+});
+export const implementationListSchema = z.strictObject({
+  items: z.array(implementationListItemSchema),
+  total: z.number().int().nonnegative(),
+  ...paginationSchema.shape,
+});
+export type ImplementationListInput = z.infer<typeof implementationListInputSchema>;
+export type ImplementationListResult = z.infer<typeof implementationListSchema>;
+
+export const implementationIdentitySchema = z.strictObject({ executionId: z.uuid() });
+
+export const implementationTriageSchema = z.strictObject({
+  id: z.uuid(),
+  ticketVersion: z.number().int().positive(),
+  classification: classificationSchema,
+  status: z.enum(["valid", "invalidated", "superseded"]),
+  changeScope: z.string().nullable(),
+  acceptanceCriteria: z.array(z.string()),
+  regressionTestPlan: z.string().nullable(),
+});
+export const implementationDeliverySchema = z.strictObject({
+  id: z.uuid(),
+  number: z.number().int().positive(),
+  branchName: z.string(),
+  baseSha: z.string().nullable(),
+  remoteHeadSha: z.string().nullable(),
+  prNumber: z.number().int().positive().nullable(),
+  prUrl: z.url().nullable(),
+  prState: z.string().nullable(),
+});
+export const implementationDetailSchema = z.strictObject({
+  execution: implementationExecutionSchema,
+  ticket: ticketSchema,
+  triage: implementationTriageSchema.nullable(),
+  delivery: implementationDeliverySchema.nullable(),
+});
+export type ImplementationDetail = z.infer<typeof implementationDetailSchema>;

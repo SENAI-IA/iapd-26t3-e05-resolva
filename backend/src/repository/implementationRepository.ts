@@ -1,6 +1,13 @@
 import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "../db/index.js";
-import { executionEvents, executions, ticketEvents, tickets, triages } from "../db/schema.js";
+import {
+  executionEvents,
+  executions,
+  deliveries,
+  ticketEvents,
+  tickets,
+  triages,
+} from "../db/schema.js";
 import {
   sourceHashesSchema,
   type ImplementationEnvironment,
@@ -9,6 +16,10 @@ import {
   type Ticket,
 } from "../domain/contracts.js";
 import {
+  implementationDetailSchema,
+  implementationExecutionSchema,
+  type ImplementationListInput,
+  type ImplementationListResult,
   type ImplementationQueueInput,
   type ImplementationQueueResult,
   type StartImplementationInput,
@@ -77,6 +88,29 @@ function eligibility(
     toImplementationTriage(triage),
     { ...environment, activeExecutionId },
   );
+}
+
+function executionDetails(execution: typeof executions.$inferSelect) {
+  return implementationExecutionSchema.parse({
+    id: execution.id,
+    ticketId: execution.ticketId,
+    ticketVersion: execution.ticketVersion,
+    triageId: execution.triageId,
+    status: execution.status,
+    stage: execution.stage,
+    mode: execution.mode,
+    round: execution.round,
+    outcome: execution.outcome,
+    startedAt: execution.startedAt.toISOString(),
+    completedAt: execution.completedAt?.toISOString() ?? null,
+  });
+}
+
+function listFilter(input: ImplementationListInput) {
+  const conditions: SQL[] = [eq(executions.kind, "implementation")];
+  if (input.ticketId) conditions.push(eq(executions.ticketId, input.ticketId));
+  if (input.status) conditions.push(eq(executions.status, input.status));
+  return and(...conditions);
 }
 
 async function activeExecutionId(connection: AppDatabase["db"] | Transaction) {
@@ -149,6 +183,73 @@ export function createImplementationRepository(database: AppDatabase) {
       );
     },
 
+    async list(input: ImplementationListInput): Promise<ImplementationListResult> {
+      return database.db.transaction(
+        async (tx) => {
+          const where = listFilter(input);
+          const rows = await tx
+            .select({ execution: executions, ticket: tickets, triage: triages })
+            .from(executions)
+            .innerJoin(tickets, eq(tickets.id, executions.ticketId))
+            .leftJoin(triages, eq(triages.id, executions.triageId))
+            .where(where)
+            .orderBy(desc(executions.startedAt), desc(executions.id))
+            .offset((input.page - 1) * input.pageSize)
+            .limit(input.pageSize);
+          const [total] = await tx.select({ value: count() }).from(executions).where(where);
+          return {
+            items: rows.map(({ execution, ticket, triage }) => ({
+              execution: executionDetails(execution),
+              ticket: toTicket(ticket, triage),
+            })),
+            total: total?.value ?? 0,
+            page: input.page,
+            pageSize: input.pageSize,
+          };
+        },
+        { isolationLevel: "repeatable read", accessMode: "read only" },
+      );
+    },
+
+    async byId(executionId: string) {
+      const [row] = await database.db
+        .select({ execution: executions, ticket: tickets, triage: triages, delivery: deliveries })
+        .from(executions)
+        .innerJoin(tickets, eq(tickets.id, executions.ticketId))
+        .leftJoin(triages, eq(triages.id, executions.triageId))
+        .leftJoin(deliveries, eq(deliveries.id, executions.deliveryId))
+        .where(and(eq(executions.id, executionId), eq(executions.kind, "implementation")))
+        .limit(1);
+      if (!row) throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+      return implementationDetailSchema.parse({
+        execution: executionDetails(row.execution),
+        ticket: toTicket(row.ticket, row.triage),
+        triage: row.triage
+          ? {
+              id: row.triage.id,
+              ticketVersion: row.triage.ticketVersion,
+              classification: row.triage.classification,
+              status: row.triage.status,
+              changeScope: row.triage.changeScope,
+              acceptanceCriteria: row.triage.acceptanceCriteria,
+              regressionTestPlan: row.triage.regressionTestPlan,
+            }
+          : null,
+        delivery: row.delivery
+          ? {
+              id: row.delivery.id,
+              number: row.delivery.number,
+              branchName: row.delivery.branchName,
+              baseSha: row.delivery.baseSha,
+              remoteHeadSha: row.delivery.remoteHeadSha,
+              prNumber: row.delivery.prNumber,
+              prUrl: row.delivery.prUrl,
+              prState: row.delivery.prState,
+            }
+          : null,
+      });
+    },
+
     async reserve(input: StartImplementationInput, environment: RuntimeEnvironment) {
       return database.db.transaction(async (tx) => {
         const [existing] = await tx
@@ -215,6 +316,7 @@ export function createImplementationRepository(database: AppDatabase) {
             ticketId: ticket.id,
             ticketVersion: ticket.version,
             kind: "implementation",
+            triageId: triage?.id,
             requestKey: input.requestKey,
             mode: "initial",
             stage: "preparando_ambiente",

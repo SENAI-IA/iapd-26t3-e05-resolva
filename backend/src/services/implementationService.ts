@@ -1,6 +1,8 @@
 import type { ImplementationEnvironment } from "../domain/contracts.js";
 import {
+  implementationListInputSchema,
   implementationQueueInputSchema,
+  type ImplementationListInput,
   type ImplementationQueueInput,
   type StartImplementationInput,
 } from "../domain/implementationContracts.js";
@@ -13,6 +15,12 @@ export function createImplementationService(
   return {
     queue(input?: ImplementationQueueInput) {
       return repository.queue(input ?? implementationQueueInputSchema.parse({}), environment);
+    },
+    list(input?: ImplementationListInput) {
+      return repository.list(input ?? implementationListInputSchema.parse({}));
+    },
+    byId(executionId: string) {
+      return repository.byId(executionId);
     },
     async start(input: StartImplementationInput) {
       const { id } = await repository.reserve(input, environment);

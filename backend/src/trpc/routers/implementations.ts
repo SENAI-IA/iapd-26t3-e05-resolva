@@ -1,4 +1,8 @@
 import {
+  implementationIdentitySchema,
+  implementationListInputSchema,
+  implementationListSchema,
+  implementationDetailSchema,
   implementationQueueInputSchema,
   implementationQueueResultSchema,
   startImplementationResultSchema,
@@ -15,4 +19,12 @@ export const implementationsRouter = router({
     .input(startImplementationSchema)
     .output(startImplementationResultSchema)
     .mutation(({ ctx, input }) => ctx.implementations.start(input)),
+  list: implementationProcedure
+    .input(implementationListInputSchema.optional())
+    .output(implementationListSchema)
+    .query(({ ctx, input }) => ctx.implementations.list(input)),
+  byId: implementationProcedure
+    .input(implementationIdentitySchema)
+    .output(implementationDetailSchema)
+    .query(({ ctx, input }) => ctx.implementations.byId(input.executionId)),
 });

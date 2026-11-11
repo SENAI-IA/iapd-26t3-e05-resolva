@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { GithubCliError, type GithubClient } from "../integrations/github/cli.js";
+import type { PipelineCallback } from "../integrations/ci/callback.js";
 import { DomainError } from "../domain/error.js";
 import type { ImplementationEnvironment } from "../domain/contracts.js";
 import {
@@ -82,6 +83,9 @@ export function createImplementationService(
     },
     byId(executionId: string) {
       return repository.byId(executionId);
+    },
+    applyCallback(callback: PipelineCallback) {
+      return repository.applyPipelineCallback(callback);
     },
     async start(input: StartImplementationInput) {
       const { id, reservation } = await repository.reserve(input, environment);

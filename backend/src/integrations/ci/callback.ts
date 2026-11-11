@@ -15,7 +15,7 @@ const pullRequestSchema = z.strictObject({
   url: z.url(),
   state: z.enum(["OPEN", "CLOSED", "MERGED"]),
 });
-const callbackSchema = z.strictObject({
+export const pipelineCallbackSchema = z.strictObject({
   schemaVersion: z.literal(1),
   executionId: z.uuid(),
   repository: repositorySchema,
@@ -28,7 +28,7 @@ const callbackSchema = z.strictObject({
   failureReason: z.string().trim().min(1).max(10000).nullable(),
 });
 
-export type PipelineCallback = z.infer<typeof callbackSchema>;
+export type PipelineCallback = z.infer<typeof pipelineCallbackSchema>;
 export type PipelineCallbackIdentity = { executionId: string; repository: string };
 
 function githubUrl(value: string, repository: string, suffix: string) {
@@ -45,7 +45,7 @@ export function parsePipelineCallback(
   expected: PipelineCallbackIdentity,
 ): PipelineCallback {
   try {
-    const callback = callbackSchema.parse(value);
+    const callback = pipelineCallbackSchema.parse(value);
     if (
       callback.executionId !== expected.executionId ||
       callback.repository !== expected.repository ||

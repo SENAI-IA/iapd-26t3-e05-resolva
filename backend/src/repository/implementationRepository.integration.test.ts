@@ -229,4 +229,54 @@ describe("implementação transacional", () => {
       blocker_code: "WORKFLOW_DISPATCH_FAILED",
     });
   });
+
+  it("aplica callback de sucesso uma única vez e aguarda revisão humana", async () => {
+    const ticketId = await eligibleTicket();
+    const reservation = await repository.reserve(
+      startImplementationSchema.parse({
+        ticketId,
+        expectedVersion: 1,
+        requestKey: randomUUID(),
+      }),
+      environment,
+    );
+    const callback = {
+      schemaVersion: 1 as const,
+      executionId: reservation.id,
+      repository: "equipe/alvo",
+      workflowId: "987654",
+      workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654",
+      status: "success" as const,
+      branch: "resolva/res-1-abc",
+      commitSha: "a".repeat(40),
+      pullRequest: {
+        number: 12,
+        url: "https://github.com/equipe/alvo/pull/12",
+        state: "OPEN" as const,
+      },
+      failureReason: null,
+    };
+
+    await expect(repository.applyPipelineCallback(callback)).resolves.toMatchObject({
+      applied: true,
+    });
+    await expect(repository.applyPipelineCallback(callback)).resolves.toMatchObject({
+      applied: false,
+    });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("aguardando_revisao");
+    const execution = await resource.database.pool.query(
+      "SELECT status,outcome,published_sha FROM executions WHERE id=$1",
+      [reservation.id],
+    );
+    expect(execution.rows[0]).toEqual({
+      status: "concluida",
+      outcome: "pipeline_succeeded",
+      published_sha: "a".repeat(40),
+    });
+    const events = await resource.database.pool.query(
+      "SELECT type FROM execution_events WHERE execution_id=$1 AND type='pipeline_callback'",
+      [reservation.id],
+    );
+    expect(events.rowCount).toBe(1);
+  });
 });

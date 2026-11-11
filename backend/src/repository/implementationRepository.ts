@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, max, or, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "../db/index.js";
 import {
   executionEvents,
@@ -8,6 +8,7 @@ import {
   tickets,
   triages,
 } from "../db/schema.js";
+import { pipelineCallbackFingerprint, type PipelineCallback } from "../integrations/ci/callback.js";
 import {
   sourceHashesSchema,
   type ImplementationEnvironment,
@@ -111,6 +112,14 @@ function listFilter(input: ImplementationListInput) {
   if (input.ticketId) conditions.push(eq(executions.ticketId, input.ticketId));
   if (input.status) conditions.push(eq(executions.status, input.status));
   return and(...conditions);
+}
+
+async function nextExecutionSequence(tx: Transaction, executionId: string) {
+  const [event] = await tx
+    .select({ value: max(executionEvents.sequence) })
+    .from(executionEvents)
+    .where(eq(executionEvents.executionId, executionId));
+  return Number(event?.value ?? 0) + 1;
 }
 
 async function activeExecutionId(connection: AppDatabase["db"] | Transaction) {
@@ -313,6 +322,117 @@ export function createImplementationRepository(database: AppDatabase) {
           stage: "preparando_ambiente",
           message,
         });
+      });
+    },
+
+    async applyPipelineCallback(callback: PipelineCallback) {
+      return database.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ execution: executions, ticket: tickets })
+          .from(executions)
+          .innerJoin(tickets, eq(tickets.id, executions.ticketId))
+          .where(
+            and(eq(executions.id, callback.executionId), eq(executions.kind, "implementation")),
+          )
+          .for("update");
+        if (!row) throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+        const fingerprint = pipelineCallbackFingerprint(callback);
+        const previous = await tx
+          .select({ payload: executionEvents.payload })
+          .from(executionEvents)
+          .where(
+            and(
+              eq(executionEvents.executionId, callback.executionId),
+              eq(executionEvents.type, "pipeline_callback"),
+            ),
+          )
+          .orderBy(desc(executionEvents.sequence))
+          .limit(1);
+        const previousFingerprint = previous[0]?.payload.fingerprint;
+        if (previousFingerprint === fingerprint) return { applied: false, fingerprint };
+        if (row.execution.status !== "em_andamento")
+          throw new DomainError(
+            "CONFLICT",
+            "A execução já foi finalizada e recebeu outro callback.",
+          );
+
+        const sequence = await nextExecutionSequence(tx, callback.executionId);
+        const payload = {
+          fingerprint,
+          status: callback.status,
+          workflowId: callback.workflowId,
+          workflowUrl: callback.workflowUrl,
+          branch: callback.branch,
+          commitSha: callback.commitSha,
+          pullRequest: callback.pullRequest,
+        };
+        let executionStatus:
+          | "em_andamento"
+          | "bloqueada"
+          | "falhou"
+          | "concluida"
+          | "interrompida" = row.execution.status;
+        let outcome = `pipeline_${callback.status}`;
+        let ticketStatus = row.ticket.status;
+        let blockerCode: string | null = null;
+        let blockerMessage: string | null = null;
+        if (callback.status === "success" && callback.commitSha && callback.pullRequest) {
+          executionStatus = "concluida";
+          outcome = "pipeline_succeeded";
+          ticketStatus =
+            row.ticket.status === "em_andamento" ? "aguardando_revisao" : row.ticket.status;
+        } else if (callback.status === "failure" || callback.status === "cancelled") {
+          executionStatus = callback.status === "failure" ? "falhou" : "interrompida";
+          outcome = `pipeline_${callback.status}`;
+          blockerCode = "PIPELINE_FAILED";
+          blockerMessage =
+            "A pipeline não concluiu a implementação. Faça uma nova tentativa após revisar o diagnóstico.";
+          ticketStatus = row.ticket.status === "em_andamento" ? "aberto" : row.ticket.status;
+        }
+        await tx
+          .update(executions)
+          .set({
+            status: executionStatus,
+            outcome,
+            blockerCode,
+            blockerMessage,
+            ...(callback.status === "success" && callback.commitSha
+              ? { publishedSha: callback.commitSha, stage: "publicando_pr" as const }
+              : {}),
+            ...(executionStatus !== "em_andamento" ? { completedAt: sql`clock_timestamp()` } : {}),
+          })
+          .where(eq(executions.id, callback.executionId));
+        if (ticketStatus !== row.ticket.status) {
+          await tx
+            .update(tickets)
+            .set({ status: ticketStatus, updatedAt: sql`clock_timestamp()` })
+            .where(eq(tickets.id, row.ticket.id));
+          await tx.insert(ticketEvents).values({
+            ticketId: row.ticket.id,
+            type:
+              callback.status === "success"
+                ? "implementation_ready_for_review"
+                : "implementation_failed",
+            fromStatus: row.ticket.status,
+            toStatus: ticketStatus,
+            message:
+              callback.status === "success"
+                ? "A implementação foi concluída e aguarda revisão humana."
+                : (blockerMessage ?? "A pipeline não concluiu a implementação."),
+            payload: { executionId: callback.executionId, fingerprint },
+            createdAt: sql`clock_timestamp()`,
+          });
+        }
+        await tx.insert(executionEvents).values({
+          executionId: callback.executionId,
+          sequence,
+          type: "pipeline_callback",
+          stage: executionStatus === "concluida" ? "publicando_pr" : row.execution.stage,
+          message: "Callback da pipeline recebido.",
+          payload,
+          createdAt: sql`clock_timestamp()`,
+        });
+        return { applied: true, fingerprint };
       });
     },
 

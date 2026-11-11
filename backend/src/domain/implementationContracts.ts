@@ -31,11 +31,16 @@ export const startImplementationSchema = ticketIdentitySchema.extend({
   requestKey: z.uuid(),
 });
 export type StartImplementationInput = z.infer<typeof startImplementationSchema>;
-
 export const startImplementationResultSchema = z.strictObject({
   implementationExecutionId: z.uuid(),
 });
 export type StartImplementationResult = z.infer<typeof startImplementationResultSchema>;
+
+export const implementationCallbackResultSchema = z.strictObject({
+  applied: z.boolean(),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+});
+export type ImplementationCallbackResult = z.infer<typeof implementationCallbackResultSchema>;
 
 const executionStatusSchema = z.enum([
   "em_andamento",

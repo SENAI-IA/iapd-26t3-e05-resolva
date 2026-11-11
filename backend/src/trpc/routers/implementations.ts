@@ -3,11 +3,13 @@ import {
   implementationListInputSchema,
   implementationListSchema,
   implementationDetailSchema,
+  implementationCallbackResultSchema,
   implementationQueueInputSchema,
   implementationQueueResultSchema,
   startImplementationResultSchema,
   startImplementationSchema,
 } from "../../domain/implementationContracts.js";
+import { pipelineCallbackSchema } from "../../integrations/ci/callback.js";
 import { implementationProcedure, router } from "../core.js";
 
 export const implementationsRouter = router({
@@ -19,6 +21,10 @@ export const implementationsRouter = router({
     .input(startImplementationSchema)
     .output(startImplementationResultSchema)
     .mutation(({ ctx, input }) => ctx.implementations.start(input)),
+  callback: implementationProcedure
+    .input(pipelineCallbackSchema)
+    .output(implementationCallbackResultSchema)
+    .mutation(({ ctx, input }) => ctx.implementations.applyCallback(input)),
   list: implementationProcedure
     .input(implementationListInputSchema.optional())
     .output(implementationListSchema)

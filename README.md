@@ -64,6 +64,7 @@ Para parar o banco preservando os dados, execute `pnpm db:down`. O volume nomead
 
 ```bash
 pnpm check          # tipos, lint, formatação, testes e build
+pnpm test:demo     # smoke test do alvo todo list
 pnpm test:integration  # PostgreSQL descartável; exige Docker disponível
 pnpm format        # aplica a formatação
 pnpm --filter backend start  # inicia a API compilada após pnpm build
@@ -145,7 +146,7 @@ autenticada do run com a intenção registrada.
 
 ## Configuração do projeto-alvo
 
-A configuração de IA é opcional nesta fase. Copie `config/resolva.config.example.json` para `resolva.config.json` na raiz e ajuste repositório, branch, modelo explícito e comandos quando houver um alvo separado. O exemplo espera um checkout em `targets/demo-target`; esse diretório e a configuração local são ignorados pelo Git. `RESOLVA_CONFIG_PATH` permite selecionar outro arquivo.
+A configuração de IA é opcional nesta fase. Copie `config/resolva.config.example.json` para `resolva.config.json` na raiz e ajuste repositório, branch, modelo explícito e comandos quando houver um alvo separado. O exemplo espera um checkout em `examples/demo-target`; esse diretório contém uma lista de tarefas simples com bug e melhoria documentados. A configuração local é ignorada pelo Git. `RESOLVA_CONFIG_PATH` permite selecionar outro arquivo.
 
 Os caminhos são relativos ao arquivo de configuração. `allowedPaths`, `testPaths` e `documentationPaths` são diretórios dentro do alvo, sem caminhos absolutos, `..` ou globs. Testes devem ficar sob os diretórios permitidos inclusive após resolver symlinks; metadados Git, credenciais e configurações de agentes não são caminhos de escrita válidos. Workspaces e artefatos ficam fora do alvo, sem sobreposição. O carregamento verifica symlinks e os comandos devem ser objetos com executável, argumentos e `cwd`, sem strings de shell. `{reportPath}` é reservado ao backend para gerar o caminho dos relatórios de teste.
 

@@ -5,7 +5,7 @@
   "workflowRef": "resolva.yml",
   "repository": "sua-equipe/seu-alvo",
   "baseBranch": "main",
-  "repositoryRoot": "targets/demo-target",
+  "repositoryRoot": "examples/demo-target",
   "allowedPaths": ["src", "tests"],
   "testPaths": ["tests"],
   "documentationPaths": ["docs"],

@@ -18,6 +18,9 @@ coverage/
 workspaces/
 artifacts/
 
+# Artefatos gerados pelo sistema demo.
+examples/demo-target/reports/
+
 # Configuração local do projeto-alvo.
 resolva.config.json
 targets/

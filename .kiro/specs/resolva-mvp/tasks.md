@@ -23,6 +23,11 @@ autenticado do run está disponível por `implementations.reconcileDispatch`.
 [Escopo e evidências do callback](docs/callback-pipeline.md).
 [Conclusão e reconciliação](docs/conclusao-implementacao.md).
 
+A tarefa 25 foi concluída com um alvo demo de lista de tarefas versionado,
+interface web mínima, bug conhecido, fixture de melhoria, testes e evidências
+locais. A correção do bug e a implementação do filtro permanecem cenários para
+execuções futuras do Resolva. [Evidências](docs/demo-target.md).
+
 As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar testes e evidências correspondentes antes de ser marcada como concluída.
 
 Última verificação em 11/11/2026: `pnpm check` (323 testes unitários, tipos, lint,
@@ -120,7 +125,8 @@ o transporte real dos snapshots/relatórios e o ensaio Kiro continuam pendentes.
 
 ## Demonstração e qualidade
 
-- [ ] 25. Criar `examples/demo-target` com bug conhecido de quantidade, regra documentada e testes existentes passando; incluir fixture de melhoria com comportamento novo e critérios explícitos.
+- [x] 25. Criar `examples/demo-target` com uma lista de tarefas, bug conhecido na seleção por ID/título, regra documentada e testes existentes passando; incluir fixture de melhoria com filtro por estado e critérios explícitos.
+  - Interface web mínima, domínio TypeScript, testes, documentação do bug/melhoria e smoke test `pnpm test:demo` implementados. [Evidências](docs/demo-target.md).
   - Requisitos: R12, R15, R26, R28.
 - [ ] 26. Criar testes unitários de domínio, triagem, repositories, elegibilidade e contratos tRPC.
   - Requisitos: R01–R08, R10, R11, R17, R19–R21, R26–R32.
@@ -248,7 +254,7 @@ Caminhos nesta tabela são entregáveis futuros. Requisitos completos continuam 
 | 22     | Larissa         | `web/src/routes/tickets/$ticketId.tsx`                                                                  | Complementar sem IA; tipo de ajuste; confirmações e reabertura                                     |
 | 23     | Larissa         | `web/src/routes/executions/{index,$executionId}.tsx`                                                    | Cursor, lote final, rede falha e reabrir página                                                    |
 | 24     | Larissa         | `web/src/routes/settings.tsx`                                                                           | Pendências sem bloquear cadastro; nenhum token                                                     |
-| 25     | Lucas           | `examples/demo-target/{src/orders/total.ts,tests/total.test.ts,docs/rules.md}`                          | Baseline passa com bug deliberado ainda não coberto                                                |
+| 25     | Lucas           | `examples/demo-target/{src/todo.ts,tests/todo.test.ts,docs/rules.md}`                          | Baseline passa com bug de títulos repetidos ainda não coberto; melhoria documentada            |
 | 26     | Felipe + donos  | Testes de domínio, repositories e routers                                                               | Entradas/estados/versões e transações                                                              |
 | 27     | Amadeu + donos  | Integrações PostgreSQL/Git/recuperação                                                                  | Concorrência/idempotência/falha parcial em recursos descartáveis                                   |
 | 28     | Sergio          | `backend/src/executor/*.test.ts` e `*.integration.test.ts`                                              | Processos Linux reais e comandos falsos no orquestrador                                            |
@@ -301,7 +307,7 @@ O detalhamento abaixo preserva a decomposição original por ciclos; o estado co
 
 #### E6 — demonstração e operação (25, 30–31)
 
-- [ ] Preparar fixture e documentação; executar baseline verde com bug conhecido antes do teste que Kiro acrescentará.
+- [x] Preparar fixture e documentação; executar baseline verde com bug conhecido antes do teste que Kiro acrescentará. [Evidências](docs/demo-target.md).
 - [ ] Executar cenário real configurado pelo produto; registrar teste vermelho/verde, modelo, SHA e PR confirmado. Revisão, merge e verificação ficam com pessoas.
 - [ ] Demonstrar informação insuficiente, ajuste e persistência após reinício; ensaiar publicação parcial/quedas em recursos de teste e identificar a natureza de cada evidência.
 - [ ] Executar `pnpm --filter backend test`, `pnpm --filter backend test:integration`, `pnpm --filter backend build`, `pnpm --filter web test`, `pnpm --filter web build`, `pnpm lint`, `pnpm format:check` e `git diff --check`, após existir cada script.

@@ -1,0 +1,159 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color: #182c28;
+  background: #f5f5ef;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  width: min(100% - 2rem, 42rem);
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: #4e625d;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 8vw, 3.25rem);
+}
+
+.intro {
+  max-width: 34rem;
+  margin: 1rem 0 2rem;
+  color: #4e625d;
+  line-height: 1.6;
+}
+
+.todo-form,
+section {
+  padding: 1.25rem;
+  border: 1px solid #d4dcd3;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.todo-form {
+  margin-bottom: 1rem;
+}
+
+.todo-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input[type="text"] {
+  min-width: 0;
+  flex: 1;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #aebdb1;
+  border-radius: 0.5rem;
+}
+
+button {
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #182c28;
+  color: #fff;
+  font-weight: 700;
+}
+
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.count {
+  color: #4e625d;
+  font-size: 0.9rem;
+}
+
+.todo-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem;
+  border: 1px solid #d4dcd3;
+  border-radius: 0.5rem;
+}
+
+.todo-item label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.todo-item label span {
+  overflow-wrap: anywhere;
+}
+
+.completed {
+  color: #4e625d;
+  text-decoration: line-through;
+}
+
+.remove-button {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.7rem;
+  background: #8a2d2d;
+  font-size: 0.85rem;
+}
+
+.empty-state {
+  margin: 1rem 0 0;
+  color: #4e625d;
+}
+
+@media (max-width: 30rem) {
+  .form-row,
+  .todo-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

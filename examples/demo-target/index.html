@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lista de tarefas demo</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <p class="eyebrow">Alvo demo do Resolva</p>
+        <h1>Lista de tarefas</h1>
+        <p class="intro">
+          Uma aplicação pequena para validar triagem, testes de regressão e melhorias.
+        </p>
+      </header>
+      <form id="todo-form" class="todo-form">
+        <label for="todo-title">Nova tarefa</label>
+        <div class="form-row">
+          <input
+            id="todo-title"
+            name="title"
+            type="text"
+            required
+            maxlength="120"
+            autocomplete="off"
+          />
+          <button type="submit">Adicionar</button>
+        </div>
+      </form>
+      <section aria-labelledby="todo-heading">
+        <div class="section-heading">
+          <h2 id="todo-heading">Tarefas</h2>
+          <span id="todo-count" class="count"></span>
+        </div>
+        <ul id="todo-list" class="todo-list"></ul>
+        <p id="empty-state" class="empty-state">Nenhuma tarefa cadastrada.</p>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

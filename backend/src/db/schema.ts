@@ -165,6 +165,8 @@ export const executions = pgTable(
     round: integer("round").default(0).notNull(),
     ticketSnapshot: object("ticket_snapshot").notNull(),
     configSnapshot: object("config_snapshot").default({}).notNull(),
+    workflowId: text("workflow_id"),
+    workflowUrl: text("workflow_url"),
     outcome: text("outcome"),
     diagnosis: text("diagnosis"),
     blockerCode: text("blocker_code"),

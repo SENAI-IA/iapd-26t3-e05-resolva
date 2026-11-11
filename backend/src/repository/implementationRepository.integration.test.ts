@@ -11,6 +11,8 @@ import { startTestDatabase } from "../test/database.js";
 import { testTargetSnapshot } from "../test/projectConfig.js";
 import { createTicketRepository } from "./ticketRepository.js";
 import { createImplementationRepository } from "./implementationRepository.js";
+import type { PipelineCallback } from "../integrations/ci/callback.js";
+import { createServer } from "../server.js";
 
 let resource: Awaited<ReturnType<typeof startTestDatabase>>;
 let tickets: ReturnType<typeof createTicketRepository>;
@@ -62,7 +64,272 @@ async function eligibleTicket() {
   return ticket.id;
 }
 
+async function reserveImplementation() {
+  const ticketId = await eligibleTicket();
+  const { id } = await repository.reserve(
+    { ticketId, expectedVersion: 1, requestKey: randomUUID() },
+    environment,
+  );
+  return { executionId: id, ticketId };
+}
+
+function pipelineCallback(
+  executionId: string,
+  overrides: Partial<PipelineCallback> = {},
+): PipelineCallback {
+  return {
+    schemaVersion: 1,
+    executionId,
+    repository: "equipe/alvo",
+    workflowId: "987654",
+    workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654",
+    status: "queued",
+    branch: null,
+    commitSha: null,
+    pullRequest: null,
+    failureReason: null,
+    ...overrides,
+  };
+}
+
 describe("implementação transacional", () => {
+  it.each([
+    [
+      "outro repositório",
+      {
+        repository: "outro/alvo",
+        workflowUrl: "https://github.com/outro/alvo/actions/runs/987654",
+      },
+    ],
+    ["sucesso sem PR ou SHA", { status: "success" as const }],
+    ["falha sem diagnóstico", { status: "failure" as const }],
+    [
+      "URL com segredo",
+      { workflowUrl: "https://ficticio@github.com/equipe/alvo/actions/runs/987654" },
+    ],
+  ])("recusa callback de %s e preserva a execução", async (_name, overrides) => {
+    const { executionId, ticketId } = await reserveImplementation();
+    await expect(
+      repository.applyPipelineCallback(pipelineCallback(executionId, overrides)),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect((await repository.byId(executionId)).execution).toMatchObject({
+      status: "em_andamento",
+      outcome: null,
+    });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("em_andamento");
+    const events = await resource.database.pool.query(
+      "SELECT id FROM execution_events WHERE execution_id=$1 AND type='pipeline_callback'",
+      [executionId],
+    );
+    expect(events.rowCount).toBe(0);
+  });
+
+  it("usa o snapshot da execução mesmo após mudança na configuração do ticket", async () => {
+    const { executionId, ticketId } = await reserveImplementation();
+    await resource.database.pool.query(
+      "UPDATE tickets SET target_config_snapshot=jsonb_set(target_config_snapshot, '{repository}', '\"outro/alvo\"') WHERE id=$1",
+      [ticketId],
+    );
+    await expect(
+      repository.applyPipelineCallback(pipelineCallback(executionId)),
+    ).resolves.toMatchObject({ applied: true });
+    expect((await repository.byId(executionId)).execution).toMatchObject({
+      workflowId: "987654",
+      workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654",
+    });
+  });
+
+  it("bloqueia callback quando o snapshot não identifica o repositório", async () => {
+    const { executionId } = await reserveImplementation();
+    await resource.database.pool.query("UPDATE executions SET config_snapshot='{}' WHERE id=$1", [
+      executionId,
+    ]);
+    await expect(
+      repository.applyPipelineCallback(pipelineCallback(executionId)),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("vincula um único workflow e rejeita troca de identidade", async () => {
+    const { executionId } = await reserveImplementation();
+    await repository.applyPipelineCallback(pipelineCallback(executionId));
+    await expect(
+      repository.applyPipelineCallback(
+        pipelineCallback(executionId, {
+          workflowId: "987655",
+          workflowUrl: "https://github.com/equipe/alvo/actions/runs/987655",
+          status: "running",
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("ignora replay antigo e recusa regressão de running para queued", async () => {
+    const { executionId } = await reserveImplementation();
+    const queued = pipelineCallback(executionId);
+    const first = await repository.applyPipelineCallback(queued);
+    await repository.applyPipelineCallback(pipelineCallback(executionId, { status: "running" }));
+    await expect(repository.applyPipelineCallback(queued)).resolves.toEqual({
+      applied: false,
+      fingerprint: first.fingerprint,
+    });
+    await expect(
+      repository.applyPipelineCallback(
+        pipelineCallback(executionId, { branch: "resolva/atrasada" }),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await repository.byId(executionId)).execution.outcome).toBe("pipeline_running");
+  });
+
+  it("replay intermediário após falha é inócuo e outro término gera conflito", async () => {
+    const { executionId, ticketId } = await reserveImplementation();
+    const running = pipelineCallback(executionId, { status: "running" });
+    await repository.applyPipelineCallback(running);
+    const failed = pipelineCallback(executionId, {
+      status: "failure",
+      failureReason: "Credencial fictícia: nao-persistir",
+    });
+    await repository.applyPipelineCallback(failed);
+    await expect(repository.applyPipelineCallback(running)).resolves.toMatchObject({
+      applied: false,
+    });
+    await expect(repository.applyPipelineCallback(failed)).resolves.toMatchObject({
+      applied: false,
+    });
+    await expect(
+      repository.applyPipelineCallback({ ...failed, status: "cancelled" }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("aberto");
+    const events = await resource.database.pool.query(
+      "SELECT payload,message FROM execution_events WHERE execution_id=$1 ORDER BY sequence",
+      [executionId],
+    );
+    expect(JSON.stringify(events.rows)).not.toContain("nao-persistir");
+    expect(events.rowCount).toBe(3);
+  });
+
+  it("serializa callbacks concorrentes sem duplicar eventos", async () => {
+    const { executionId } = await reserveImplementation();
+    const callback = pipelineCallback(executionId, { status: "running" });
+    const results = await Promise.all([
+      repository.applyPipelineCallback(callback),
+      repository.applyPipelineCallback(callback),
+    ]);
+    expect(results.map((result) => result.applied).sort()).toEqual([false, true]);
+    const events = await resource.database.pool.query(
+      "SELECT sequence FROM execution_events WHERE execution_id=$1 ORDER BY sequence",
+      [executionId],
+    );
+    expect(events.rows).toEqual([{ sequence: 1 }, { sequence: 2 }]);
+  });
+
+  it("faz rollback da identidade, conclusão e ticket quando o evento não pode ser gravado", async () => {
+    const { executionId, ticketId } = await reserveImplementation();
+    await resource.database.pool.query(
+      "ALTER TABLE execution_events ADD CONSTRAINT callback_test_failure CHECK (type <> 'pipeline_callback')",
+    );
+    try {
+      await expect(
+        repository.applyPipelineCallback(
+          pipelineCallback(executionId, {
+            status: "success",
+            branch: "resolva/res-1",
+            commitSha: "a".repeat(40),
+            pullRequest: {
+              number: 12,
+              url: "https://github.com/equipe/alvo/pull/12",
+              state: "OPEN",
+            },
+          }),
+        ),
+      ).rejects.toThrow();
+    } finally {
+      await resource.database.pool.query(
+        "ALTER TABLE execution_events DROP CONSTRAINT callback_test_failure",
+      );
+    }
+    expect((await repository.byId(executionId)).execution).toMatchObject({
+      status: "em_andamento",
+      outcome: null,
+      workflowId: null,
+      workflowUrl: null,
+      completedAt: null,
+    });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("em_andamento");
+    const history = await resource.database.pool.query(
+      "SELECT id FROM ticket_events WHERE ticket_id=$1 AND type='implementation_ready_for_review'",
+      [ticketId],
+    );
+    expect(history.rowCount).toBe(0);
+  });
+
+  it("registra confirmação de disparo após callback sem colidir ou duplicar eventos", async () => {
+    const { executionId } = await reserveImplementation();
+    await repository.applyPipelineCallback(pipelineCallback(executionId, { status: "running" }));
+    await repository.markWorkflowDispatched(executionId);
+    await repository.markWorkflowDispatched(executionId);
+    const events = await resource.database.pool.query(
+      "SELECT sequence,type FROM execution_events WHERE execution_id=$1 ORDER BY sequence",
+      [executionId],
+    );
+    expect(events.rows).toEqual([
+      { sequence: 1, type: "started" },
+      { sequence: 2, type: "pipeline_callback" },
+      { sequence: 3, type: "workflow_dispatched" },
+    ]);
+  });
+
+  it("preserva workflow confirmada por callback quando a resposta do disparo se perde", async () => {
+    const { executionId, ticketId } = await reserveImplementation();
+    await repository.applyPipelineCallback(pipelineCallback(executionId, { status: "running" }));
+    await repository.blockWorkflowDispatch(executionId);
+    expect((await repository.byId(executionId)).execution).toMatchObject({
+      status: "em_andamento",
+      outcome: "pipeline_running",
+      workflowId: "987654",
+    });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("em_andamento");
+    const events = await resource.database.pool.query(
+      "SELECT sequence,type FROM execution_events WHERE execution_id=$1 ORDER BY sequence",
+      [executionId],
+    );
+    expect(events.rows).toEqual([
+      { sequence: 1, type: "started" },
+      { sequence: 2, type: "pipeline_callback" },
+    ]);
+  });
+
+  it("expõe erro público e identidade do workflow por HTTP", async () => {
+    const { executionId } = await reserveImplementation();
+    const service = createImplementationService(repository, environment);
+    const server = createServer({ implementationService: service });
+    try {
+      const invalid = await server.inject({
+        method: "POST",
+        url: "/trpc/implementations.callback",
+        headers: { host: "127.0.0.1:3000" },
+        payload: pipelineCallback(executionId, { status: "success" }),
+      });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json().error.data.code).toBe("BAD_REQUEST");
+      const valid = await server.inject({
+        method: "POST",
+        url: "/trpc/implementations.callback",
+        headers: { host: "127.0.0.1:3000" },
+        payload: pipelineCallback(executionId),
+      });
+      expect(valid.statusCode).toBe(200);
+      const detail = await server.inject({
+        method: "GET",
+        url: `/trpc/implementations.byId?input=${encodeURIComponent(JSON.stringify({ executionId }))}`,
+        headers: { host: "127.0.0.1:3000" },
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json().result.data.execution.workflowId).toBe("987654");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("lista o ticket na fila e informa a elegibilidade", async () => {
     const ticketId = await eligibleTicket();
     const result = await repository.queue(implementationQueueInputSchema.parse({}), environment);

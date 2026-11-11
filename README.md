@@ -12,7 +12,7 @@ O público inicial são equipes de engenharia que precisam acelerar correções 
 
 ## Estado do projeto
 
-**Tickets e conclusões de triagem persistidos no PostgreSQL e consultáveis por API.** O backend mantém histórico e controle de versão dos tickets, com ações de complementação, contestação, resolução e reabertura. A triagem classifica evidências estruturadas e mantém as conclusões anteriores. A execução real da triagem depende da integração com o Kiro. Interface, fila de implementação e integração GitHub permanecem pendentes.
+**Tickets, triagens e reservas de implementação persistidos no PostgreSQL e consultáveis por API.** O backend mantém histórico e controle de versão dos tickets, com ações de complementação, contestação, resolução e reabertura. A fila e o início manual de implementação estão implementados no backend, com callbacks validados e idempotentes. A execução real depende da integração do ambiente, Kiro e GitHub; o início padrão permanece bloqueado. Interface e reconciliação remota permanecem pendentes.
 
 ## Fluxo previsto
 
@@ -101,6 +101,16 @@ O domínio classifica evidências estruturadas e confere a versão do ticket e o
 Cada reserva grava o snapshot da versão analisada, incluindo complementos e contestações ligados à conclusão original. Um conflito de concorrência informa `activeExecutionId` quando há outra execução ativa. A conclusão registra mensagem, fontes, hashes e critérios, e atualiza a triagem vigente na mesma transação. Se a análise falhar tecnicamente, o ticket volta a `aberto` e mantém o histórico. Os testes de integração usam um executor falso para verificar esse fluxo via HTTP e PostgreSQL.
 
 O adaptador de triagem prepara um workspace descartável, gera o perfil Kiro V3 para as fontes selecionadas e valida o relatório antes da persistência. A integração HTTP usa um processo simulado em testes. [Compatibilidade e ensaio do Kiro](.kiro/specs/resolva-mvp/docs/kiro-compatibility.md).
+
+## Callback de implementação
+
+O backend também expõe `implementations.queue`, `start`, `list`, `byId` e
+`callback`. O início padrão continua bloqueado até a integração do ambiente.
+Callbacks são validados contra o snapshot da execução, vinculam um único workflow
+e ignoram mensagens já aplicadas, inclusive após a conclusão. A migração
+`0002_identidade_workflow.sql` preserva a identidade de workflows existentes.
+Confirmação remota de SHA, testes e PR e reconciliação ainda estão pendentes.
+[Detalhes e evidências do callback](.kiro/specs/resolva-mvp/docs/callback-pipeline.md).
 
 ## Configuração do projeto-alvo
 

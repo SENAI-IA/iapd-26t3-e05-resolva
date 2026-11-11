@@ -1,8 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDatabase, type AppDatabase } from "./index.js";
 import { migrateDatabase } from "./migrate.js";
+import { createImplementationRepository } from "../repository/implementationRepository.js";
+import { pipelineCallbackFingerprint, type PipelineCallback } from "../integrations/ci/callback.js";
 
 let container: StartedPostgreSqlContainer | undefined;
 let database: AppDatabase;
@@ -48,6 +54,134 @@ async function execution(
 }
 
 describe("schema e migrações PostgreSQL", () => {
+  it.each([false, true])(
+    "preserva identidade no upgrade de banco existente (histórico divergente: %s)",
+    async (divergent) => {
+      const legacyContainer = await new PostgreSqlContainer("postgres:17-alpine").start();
+      const legacy = createDatabase(legacyContainer.getConnectionUri());
+      const folder = await mkdtemp(join(tmpdir(), "resolva-migration-"));
+      try {
+        await mkdir(join(folder, "meta"));
+        await Promise.all([
+          copyFile(
+            new URL("../../drizzle/0000_init.sql", import.meta.url),
+            join(folder, "0000_init.sql"),
+          ),
+          copyFile(
+            new URL("../../drizzle/0001_normal_leech.sql", import.meta.url),
+            join(folder, "0001_normal_leech.sql"),
+          ),
+        ]);
+        const journal = JSON.parse(
+          await readFile(new URL("../../drizzle/meta/_journal.json", import.meta.url), "utf8"),
+        ) as { entries: { idx: number }[] };
+        await writeFile(
+          join(folder, "meta/_journal.json"),
+          JSON.stringify({ ...journal, entries: journal.entries.filter((entry) => entry.idx < 2) }),
+        );
+        await migrate(legacy.db, { migrationsFolder: folder });
+        const created = await legacy.pool.query<{ id: number }>(
+          `INSERT INTO tickets (target_system_key,target_config_version,target_config_snapshot,title,description,expected_behavior,category,status)
+         VALUES ('demo',1,'{}','Quantidade','Descrição','Esperado','calculo','em_andamento') RETURNING id`,
+        );
+        const ticketId = created.rows[0]?.id;
+        const executionId = randomUUID();
+        const callback: PipelineCallback = {
+          schemaVersion: 1,
+          executionId,
+          repository: "equipe/alvo",
+          workflowId: "987654",
+          workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654",
+          status: "running",
+          branch: null,
+          commitSha: null,
+          pullRequest: null,
+          failureReason: null,
+        };
+        await legacy.pool.query(
+          `INSERT INTO executions (id,ticket_id,ticket_version,kind,request_key,ticket_snapshot,config_snapshot,outcome)
+         VALUES ($1,$2,1,'implementation',$3,'{}','{"repository":"equipe/alvo"}','pipeline_running')`,
+          [executionId, ticketId, randomUUID()],
+        );
+        await legacy.pool.query(
+          "INSERT INTO execution_events (execution_id,sequence,type,message,payload) VALUES ($1,1,'pipeline_callback','Callback recebido',$2)",
+          [
+            executionId,
+            JSON.stringify({ ...callback, fingerprint: pipelineCallbackFingerprint(callback) }),
+          ],
+        );
+        if (divergent) {
+          const other = {
+            ...callback,
+            workflowId: "987655",
+            workflowUrl: "https://github.com/equipe/alvo/actions/runs/987655",
+          };
+          await legacy.pool.query(
+            "INSERT INTO execution_events (execution_id,sequence,type,message,payload) VALUES ($1,2,'pipeline_callback','Callback recebido',$2)",
+            [
+              executionId,
+              JSON.stringify({ ...other, fingerprint: pipelineCallbackFingerprint(other) }),
+            ],
+          );
+        }
+        await migrateDatabase(legacy);
+        const identity = await legacy.pool.query(
+          "SELECT workflow_id,workflow_url,status FROM executions WHERE id=$1",
+          [executionId],
+        );
+        expect(identity.rows[0]).toEqual({
+          workflow_id: "987654",
+          workflow_url: callback.workflowUrl,
+          status: "em_andamento",
+        });
+        const repository = createImplementationRepository(legacy);
+        if (divergent) {
+          await expect(repository.applyPipelineCallback(callback)).rejects.toMatchObject({
+            code: "PRECONDITION_FAILED",
+          });
+          await expect(
+            repository.applyPipelineCallback({
+              ...callback,
+              status: "failure",
+              failureReason: "Falha fictícia",
+            }),
+          ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+          const blocked = await legacy.pool.query(
+            "SELECT status,blocker_code FROM executions WHERE id=$1",
+            [executionId],
+          );
+          expect(blocked.rows[0]).toEqual({
+            status: "em_andamento",
+            blocker_code: "WORKFLOW_IDENTITY_CONFLICT",
+          });
+        } else {
+          await expect(repository.applyPipelineCallback(callback)).resolves.toMatchObject({
+            applied: false,
+          });
+          await expect(
+            repository.applyPipelineCallback({
+              ...callback,
+              workflowId: "987655",
+              workflowUrl: "https://github.com/equipe/alvo/actions/runs/987655",
+            }),
+          ).rejects.toMatchObject({ code: "CONFLICT" });
+        }
+        await migrateDatabase(legacy);
+        expect(
+          (
+            await legacy.pool.query("SELECT id FROM execution_events WHERE execution_id=$1", [
+              executionId,
+            ])
+          ).rowCount,
+        ).toBe(divergent ? 2 : 1);
+      } finally {
+        await legacy.close();
+        await legacyContainer.stop();
+        await rm(folder, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("cria sete tabelas e reaplica migrações sem perder registros", async () => {
     const result = await database.pool.query<{ tablename: string }>(
       "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename",

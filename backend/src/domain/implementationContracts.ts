@@ -62,6 +62,8 @@ export const implementationExecutionSchema = z.strictObject({
   mode: executionModeSchema.nullable(),
   round: z.number().int().nonnegative().max(3),
   outcome: z.string().nullable(),
+  workflowId: z.string().nullable(),
+  workflowUrl: z.url().nullable(),
   startedAt: isoDate,
   completedAt: isoDate.nullable(),
 });

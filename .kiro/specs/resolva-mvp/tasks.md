@@ -8,7 +8,15 @@ das tarefas 5–7 e 9; limites e evidências em [docs/tickets-api.md](docs/ticke
 As regras de domínio de triagem e elegibilidade (tarefa 32) estão implementadas;
 evidências em [docs/triagem-dominio.md](docs/triagem-dominio.md). A reserva e a
 conclusão de triagem são transacionais e as consultas estão disponíveis por tRPC.
-O adaptador de triagem Kiro está exercitado com processo simulado. A execução real pelo Kiro CLI headless, a fila de implementação e a interface permanecem pendentes.
+O adaptador de triagem Kiro está exercitado com processo simulado. A execução real
+pelo Kiro CLI headless e a interface permanecem pendentes.
+
+A fila, a reserva manual e as consultas de implementação estão disponíveis no
+backend, com disparo pelo cliente `gh` em testes. O callback agora valida o
+snapshot, preserva a identidade do workflow e trata replay/concorrência de forma
+transacional. O ambiente padrão mantém novos inícios bloqueados; confirmação
+remota de evidências, reconciliação e interface permanecem pendentes.
+[Escopo e evidências do callback](docs/callback-pipeline.md).
 
 As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar testes e evidências correspondentes antes de ser marcada como concluída.
 
@@ -168,7 +176,7 @@ Esforço de referência do Gate 0: 16 pessoas-hora. Não marcar concluído por d
 | `backend/src/executor/instanceGuard.ts`      | `acquireInstanceGuard(database: AppDatabase, runtimeRoot: string): Promise<InstanceGuard>`; `assertOwned()`/`release()` assíncronos                                 | Sergio          |
 | `backend/src/integrations/ci/client.ts`      | `triggerPipeline(input: PipelineInput): Promise<PipelineReference>`; `reconcilePipeline(executionId: string): Promise<PipelineResult>`                              | Lucas/Amadeu    |
 | `backend/src/integrations/kiro/report.ts`    | `parseRunReport(value: unknown, expected: ReportIdentity): RunReport`                                                                                               | Lucas           |
-| `backend/src/integrations/github/publish.ts` | `publishValidated(input: PublishInput): Promise<PullRequestReference>`; `reconcileDelivery(deliveryId: string): Promise<ReconciliationResult>`                     | Amadeu          |
+| `backend/src/integrations/github/publish.ts` | `publishValidated(input: PublishInput): Promise<PullRequestReference>`; `reconcileDelivery(deliveryId: string): Promise<ReconciliationResult>`                      | Amadeu          |
 | `backend/src/services/executionService.ts`   | `startExecution(input: StartExecutionInput): Promise<StartExecutionResult>`                                                                                         | Sergio          |
 | `backend/src/executor/runExecution.ts`       | `runExecution(executionId: string, dependencies: ExecutionDependencies): Promise<void>`                                                                             | Sergio          |
 | `backend/src/executor/recovery.ts`           | `recoverInterruptedExecutions(database: AppDatabase, guard: InstanceGuard): Promise<number>`                                                                        | Sergio          |

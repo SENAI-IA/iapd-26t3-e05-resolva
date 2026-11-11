@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasControlCharacters } from "../../config/strings.js";
 import {
   parsePipelineCallback,
   type PipelineCallback,
@@ -18,7 +19,7 @@ const workflowSchema = z
   .trim()
   .min(1)
   .max(255)
-  .refine((value) => !/[\u0000-\u001f\u007f]/u.test(value));
+  .refine((value) => !hasControlCharacters(value));
 const pipelineInputSchema = z.strictObject({
   executionId: z.uuid(),
   repository: repositorySchema,

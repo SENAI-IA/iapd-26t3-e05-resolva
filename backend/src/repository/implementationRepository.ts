@@ -8,7 +8,12 @@ import {
   tickets,
   triages,
 } from "../db/schema.js";
-import { pipelineCallbackFingerprint, type PipelineCallback } from "../integrations/ci/callback.js";
+import {
+  parsePipelineCallback,
+  pipelineCallbackFingerprint,
+  pipelineCallbackSchema,
+  type PipelineCallback,
+} from "../integrations/ci/callback.js";
 import {
   sourceHashesSchema,
   type ImplementationEnvironment,
@@ -102,6 +107,8 @@ function executionDetails(execution: typeof executions.$inferSelect) {
     mode: execution.mode,
     round: execution.round,
     outcome: execution.outcome,
+    workflowId: execution.workflowId,
+    workflowUrl: execution.workflowUrl,
     startedAt: execution.startedAt.toISOString(),
     completedAt: execution.completedAt?.toISOString() ?? null,
   });
@@ -269,9 +276,20 @@ export function createImplementationRepository(database: AppDatabase) {
         if (!execution)
           throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
         if (execution.status !== "em_andamento") return;
+        const [dispatched] = await tx
+          .select({ id: executionEvents.id })
+          .from(executionEvents)
+          .where(
+            and(
+              eq(executionEvents.executionId, executionId),
+              eq(executionEvents.type, "workflow_dispatched"),
+            ),
+          )
+          .limit(1);
+        if (dispatched) return;
         await tx.insert(executionEvents).values({
           executionId,
-          sequence: 2,
+          sequence: await nextExecutionSequence(tx, executionId),
           type: "workflow_dispatched",
           stage: "preparando_ambiente",
           message: "Workflow de implementação disparada.",
@@ -289,7 +307,7 @@ export function createImplementationRepository(database: AppDatabase) {
           .for("update");
         if (!row || row.execution.kind !== "implementation")
           throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
-        if (row.execution.status !== "em_andamento") return;
+        if (row.execution.status !== "em_andamento" || row.execution.workflowId !== null) return;
         const message =
           "A workflow não pôde ser confirmada. Faça uma nova triagem antes de tentar novamente.";
         await tx
@@ -325,36 +343,62 @@ export function createImplementationRepository(database: AppDatabase) {
       });
     },
 
-    async applyPipelineCallback(callback: PipelineCallback) {
+    async applyPipelineCallback(input: PipelineCallback) {
       return database.db.transaction(async (tx) => {
         const [row] = await tx
           .select({ execution: executions, ticket: tickets })
           .from(executions)
           .innerJoin(tickets, eq(tickets.id, executions.ticketId))
-          .where(
-            and(eq(executions.id, callback.executionId), eq(executions.kind, "implementation")),
-          )
+          .where(and(eq(executions.id, input.executionId), eq(executions.kind, "implementation")))
           .for("update");
         if (!row) throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+        if (row.execution.blockerCode === "WORKFLOW_IDENTITY_CONFLICT")
+          throw new DomainError(
+            "PRECONDITION_FAILED",
+            "O histórico contém workflows divergentes. Reconcilie a execução antes de receber novos callbacks.",
+          );
+        const repository = pipelineCallbackSchema.shape.repository.safeParse(
+          row.execution.configSnapshot.repository,
+        );
+        if (!repository.success)
+          throw new DomainError(
+            "PRECONDITION_FAILED",
+            "A configuração da execução não identifica um repositório válido.",
+          );
+        let callback: PipelineCallback;
+        try {
+          callback = parsePipelineCallback(input, {
+            executionId: row.execution.id,
+            repository: repository.data,
+          });
+        } catch {
+          throw new DomainError("BAD_REQUEST", "Callback da pipeline inválido.");
+        }
+        if (
+          (row.execution.workflowId !== null && row.execution.workflowId !== callback.workflowId) ||
+          (row.execution.workflowUrl !== null && row.execution.workflowUrl !== callback.workflowUrl)
+        )
+          throw new DomainError("CONFLICT", "O callback pertence a outro workflow.");
         const fingerprint = pipelineCallbackFingerprint(callback);
-        const previous = await tx
+        const [replay] = await tx
           .select({ payload: executionEvents.payload })
           .from(executionEvents)
           .where(
             and(
               eq(executionEvents.executionId, callback.executionId),
               eq(executionEvents.type, "pipeline_callback"),
+              sql`${executionEvents.payload}->>'fingerprint' = ${fingerprint}`,
             ),
           )
-          .orderBy(desc(executionEvents.sequence))
           .limit(1);
-        const previousFingerprint = previous[0]?.payload.fingerprint;
-        if (previousFingerprint === fingerprint) return { applied: false, fingerprint };
+        if (replay) return { applied: false, fingerprint };
         if (row.execution.status !== "em_andamento")
           throw new DomainError(
             "CONFLICT",
             "A execução já foi finalizada e recebeu outro callback.",
           );
+        if (row.execution.outcome === "pipeline_running" && callback.status === "queued")
+          throw new DomainError("CONFLICT", "O callback não pode regredir o estado da pipeline.");
 
         const sequence = await nextExecutionSequence(tx, callback.executionId);
         const payload = {
@@ -396,6 +440,8 @@ export function createImplementationRepository(database: AppDatabase) {
             outcome,
             blockerCode,
             blockerMessage,
+            workflowId: callback.workflowId,
+            workflowUrl: callback.workflowUrl,
             ...(callback.status === "success" && callback.commitSha
               ? { publishedSha: callback.commitSha, stage: "publicando_pr" as const }
               : {}),

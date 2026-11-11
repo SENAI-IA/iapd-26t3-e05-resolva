@@ -60,12 +60,50 @@ describe("callback da pipeline", () => {
 
   it.each([
     ["execução diferente", { executionId: "22222222-2222-4222-8222-222222222222" }],
+    ["repositório diferente", { repository: "outro/alvo" }],
+    [
+      "workflow com credencial na URL",
+      { workflowUrl: "https://token@github.com/equipe/alvo/actions/runs/987654" },
+    ],
+    [
+      "workflow com porta alternativa",
+      { workflowUrl: "https://github.com:8443/equipe/alvo/actions/runs/987654" },
+    ],
+    [
+      "workflow com query",
+      { workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654?token=ficticio" },
+    ],
+    [
+      "workflow com fragmento",
+      { workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654#ficticio" },
+    ],
+    [
+      "workflow sem ID numérico",
+      { workflowId: "abc", workflowUrl: "https://github.com/equipe/alvo/actions/runs/abc" },
+    ],
     [
       "URL de workflow de outro repositório",
       { workflowUrl: "https://github.com/outro/alvo/actions/runs/987654" },
     ],
     ["sucesso sem PR", { pullRequest: null }],
     ["falha sem diagnóstico", { status: "failure", failureReason: null }],
+    [
+      "PR de outro repositório em estado intermediário",
+      {
+        status: "running",
+        pullRequest: { number: 12, url: "https://github.com/outro/alvo/pull/12", state: "OPEN" },
+      },
+    ],
+    [
+      "PR com credencial na URL",
+      {
+        pullRequest: {
+          number: 12,
+          url: "https://token@github.com/equipe/alvo/pull/12",
+          state: "OPEN",
+        },
+      },
+    ],
     [
       "PR fechada",
       {

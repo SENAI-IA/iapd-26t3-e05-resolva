@@ -19,7 +19,10 @@ export const pipelineCallbackSchema = z.strictObject({
   schemaVersion: z.literal(1),
   executionId: z.uuid(),
   repository: repositorySchema,
-  workflowId: z.string().trim().min(1).max(200),
+  workflowId: z
+    .string()
+    .max(200)
+    .regex(/^[1-9][0-9]*$/u),
   workflowUrl: z.url(),
   status: z.enum(["queued", "running", "success", "failure", "cancelled"]),
   branch: branchSchema.nullable(),
@@ -32,12 +35,7 @@ export type PipelineCallback = z.infer<typeof pipelineCallbackSchema>;
 export type PipelineCallbackIdentity = { executionId: string; repository: string };
 
 function githubUrl(value: string, repository: string, suffix: string) {
-  const url = new URL(value);
-  return (
-    url.protocol === "https:" &&
-    url.hostname === "github.com" &&
-    url.pathname === `/${repository}/${suffix}`
-  );
+  return value === `https://github.com/${repository}/${suffix}`;
 }
 
 export function parsePipelineCallback(
@@ -52,16 +50,17 @@ export function parsePipelineCallback(
       !githubUrl(callback.workflowUrl, callback.repository, `actions/runs/${callback.workflowId}`)
     )
       throw new Error();
+    if (
+      callback.pullRequest &&
+      !githubUrl(
+        callback.pullRequest.url,
+        callback.repository,
+        `pull/${callback.pullRequest.number}`,
+      )
+    )
+      throw new Error();
     if (callback.status === "success") {
       if (!callback.branch || !callback.commitSha || !callback.pullRequest) throw new Error();
-      if (
-        !githubUrl(
-          callback.pullRequest.url,
-          callback.repository,
-          `pull/${callback.pullRequest.number}`,
-        )
-      )
-        throw new Error();
       if (callback.pullRequest.state !== "OPEN") throw new Error();
       if (callback.failureReason !== null) throw new Error();
     } else if (callback.status === "failure" || callback.status === "cancelled") {

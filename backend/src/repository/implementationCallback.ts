@@ -61,7 +61,10 @@ export async function lockPipelineCallback(tx: ImplementationTransaction, input:
       throw new DomainError("CONFLICT", "A execução já foi finalizada e recebeu outro callback.");
     if (
       (row.execution.outcome === "pipeline_running" && callback.status === "queued") ||
-      (row.execution.outcome === "pipeline_awaiting_confirmation" && callback.status !== "success")
+      (["pipeline_awaiting_confirmation", "pipeline_awaiting_report"].includes(
+        row.execution.outcome ?? "",
+      ) &&
+        callback.status !== "success")
     )
       throw new DomainError("CONFLICT", "O callback não pode regredir o estado da pipeline.");
   }

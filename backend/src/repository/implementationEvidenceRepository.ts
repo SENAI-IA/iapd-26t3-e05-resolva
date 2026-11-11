@@ -8,6 +8,8 @@ import {
   implementationEvidenceSchema,
 } from "../domain/implementationEvidence.js";
 import { nextExecutionSequence, validationEvent } from "./implementationTransactions.js";
+import { workflowDispatchConstraints } from "./implementationDispatchRepository.js";
+import { assertEvidenceMatchesDispatch } from "../domain/implementationDispatch.js";
 
 export function createImplementationEvidenceRepository(database: AppDatabase) {
   return {
@@ -40,6 +42,7 @@ export function createImplementationEvidenceRepository(database: AppDatabase) {
           execution.ticketSnapshot.classification !== evidence.classification
         )
           throw new DomainError("CONFLICT", "A evidência pertence a outra entrega ou workflow.");
+        assertEvidenceMatchesDispatch(evidence, await workflowDispatchConstraints(tx, execution));
         const [delivery] = await tx
           .select()
           .from(deliveries)

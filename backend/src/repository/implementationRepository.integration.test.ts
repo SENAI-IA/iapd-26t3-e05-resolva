@@ -493,6 +493,16 @@ describe("implementação transacional", () => {
     const ticketId = await eligibleTicket();
     const execute = vi.fn<GhExecution>(async (args) => {
       if (args[0] === "auth") return { stdout: "", stderr: "" };
+      if (args[0] === "api")
+        return {
+          stdout: JSON.stringify({
+            id: 456,
+            path: ".github/workflows/resolva.yml",
+            state: "active",
+            url: "https://api.github.com/repos/equipe/alvo/actions/workflows/456",
+          }),
+          stderr: "",
+        };
       return { stdout: "", stderr: "" };
     });
     const github = createGithubClient({ execute });
@@ -508,11 +518,11 @@ describe("implementação transacional", () => {
     expect(result.implementationExecutionId).toBeTypeOf("string");
     const detail = await repository.byId(result.implementationExecutionId);
     expect(execute).toHaveBeenNthCalledWith(
-      3,
+      4,
       [
         "workflow",
         "run",
-        "main",
+        "456",
         "--repo",
         "equipe/alvo",
         "--ref",
@@ -536,13 +546,14 @@ describe("implementação transacional", () => {
     );
     expect(events.rows).toEqual([
       { sequence: 1, type: "started" },
-      { sequence: 2, type: "workflow_dispatched" },
+      { sequence: 2, type: "workflow_dispatch_requested" },
+      { sequence: 3, type: "workflow_dispatched" },
     ]);
     await expect(service.start(input)).resolves.toEqual(result);
-    expect(execute).toHaveBeenCalledTimes(3);
+    expect(execute).toHaveBeenCalledTimes(4);
   });
 
-  it("bloqueia a execução e devolve o ticket a aberto quando o disparo falha", async () => {
+  it("bloqueia a execução e devolve o ticket a aberto quando o ambiente impede o envio", async () => {
     const ticketId = await eligibleTicket();
     const execute = vi.fn<GhExecution>(async (args) => {
       if (args[0] === "auth") return { stdout: "", stderr: "" };

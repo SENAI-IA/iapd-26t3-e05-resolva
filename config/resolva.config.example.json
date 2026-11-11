@@ -2,7 +2,7 @@
   "targetSystemKey": "demo",
   "displayName": "Sistema demo",
   "version": 1,
-  "workflowRef": "main",
+  "workflowRef": "resolva.yml",
   "repository": "sua-equipe/seu-alvo",
   "baseBranch": "main",
   "repositoryRoot": "targets/demo-target",

@@ -7,6 +7,8 @@ import {
   githubRunIdSchema,
   gitShaSchema,
   sameRepository,
+  githubWorkflowFileSchema,
+  githubWorkflowSelectorSchema,
 } from "./contracts.js";
 import { GithubCliError } from "./error.js";
 
@@ -34,6 +36,8 @@ const workflowRunSchema = z.object({
   head_branch: githubBranchSchema.nullable(),
   head_sha: gitShaSchema,
   repository: repositorySchema,
+  display_title: z.string().max(1000),
+  created_at: z.iso.datetime({ offset: true }),
 });
 const pullRequestSchema = z
   .object({
@@ -67,6 +71,33 @@ export function createGithubInspection(run: (args: readonly string[]) => Promise
   const get = (endpoint: string) =>
     run(["api", "--hostname", "github.com", "--method", "GET", endpoint]);
   return {
+    async getWorkflowDefinition(input: { repository: string; workflow: string }) {
+      const repository = githubRepositorySchema.parse(input.repository);
+      const selector = githubWorkflowSelectorSchema.parse(input.workflow);
+      const workflow = selector.replace(/^\.github\/workflows\//u, "");
+      const result = await get(
+        `repos/${repository}/actions/workflows/${encodeURIComponent(workflow)}`,
+      );
+      return parseResponse(result.stdout, (value) => {
+        const data = z
+          .object({
+            id: githubNumberSchema,
+            path: githubWorkflowFileSchema,
+            state: z.string().min(1).max(100),
+            url: z.url(),
+          })
+          .parse(value);
+        if (
+          (/^[0-9]+$/u.test(workflow)
+            ? String(data.id) !== workflow
+            : data.path !== `.github/workflows/${workflow}`) ||
+          data.url.toLowerCase() !==
+            `https://api.github.com/repos/${repository}/actions/workflows/${data.id}`.toLowerCase()
+        )
+          throw new Error();
+        return { id: String(data.id), path: data.path, state: data.state };
+      });
+    },
     async getWorkflowRun(input: { repository: string; workflowId: string }) {
       const repository = githubRepositorySchema.parse(input.repository);
       const workflowId = githubRunIdSchema.parse(input.workflowId);
@@ -91,6 +122,8 @@ export function createGithubInspection(run: (args: readonly string[]) => Promise
           headBranch: data.head_branch,
           headSha: data.head_sha,
           repository: data.repository.full_name,
+          displayTitle: data.display_title,
+          createdAt: new Date(data.created_at).toISOString(),
         };
       });
     },
@@ -136,3 +169,7 @@ export function createGithubInspection(run: (args: readonly string[]) => Promise
     },
   };
 }
+
+export type GithubWorkflowRun = Awaited<
+  ReturnType<ReturnType<typeof createGithubInspection>["getWorkflowRun"]>
+>;

@@ -1,7 +1,6 @@
 # Resolva — plano de implementação
 
-Status: desenvolvimento iniciado. A fundação e o schema base (tarefas 1, 3–4) foram implementados; a configuração estrutural da tarefa 2 e o servidor mínimo da tarefa 9 também estão disponíveis. O vínculo da configuração única do sistema-alvo ao ticket ainda precisa ser especificado no schema e validado. Evidências e limites em [docs/fundacao.md](docs/fundacao.md) e [docs/configuracao-persistencia.md](docs/configuracao-persistencia.md).
-Evidências e limites em [docs/fundacao.md](docs/fundacao.md) e
+Status: desenvolvimento iniciado. Workspace, PostgreSQL, Drizzle e schema base estão disponíveis. A configuração do sistema-alvo já possui chave, versão, hash e snapshot vinculados ao ticket; a revalidação operacional completa antes dos efeitos externos permanece pendente na tarefa 38. Evidências e limites em [docs/fundacao.md](docs/fundacao.md) e
 [docs/configuracao-persistencia.md](docs/configuracao-persistencia.md).
 O cadastro e a consulta de tickets por tRPC estão implementados na primeira fatia
 das tarefas 5–7 e 9; limites e evidências em [docs/tickets-api.md](docs/tickets-api.md).
@@ -17,23 +16,36 @@ snapshot, preserva a identidade do workflow e trata replay/concorrência de form
 transacional. A reserva agora cria a entrega antes do disparo; o sucesso exige
 evidência aprovada internamente e confirmação remota de workflow, PR e SHA. A
 reconciliação manual de propostas persistidas está disponível por tRPC. O ambiente
-padrão mantém novos inícios bloqueados; coleta real das evidências, recuperação
-do disparo sem resposta e interface permanecem pendentes.
+padrão mantém novos inícios bloqueados; coleta real das evidências, retomada
+automática na inicialização e interface permanecem pendentes. O disparo já grava
+checkpoint e conserva exclusividade após resposta perdida; o vínculo manual
+autenticado do run está disponível por `implementations.reconcileDispatch`.
 [Escopo e evidências do callback](docs/callback-pipeline.md).
 [Conclusão e reconciliação](docs/conclusao-implementacao.md).
 
 As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar testes e evidências correspondentes antes de ser marcada como concluída.
+
+Última verificação em 11/11/2026: `pnpm check` (323 testes unitários, tipos, lint,
+formatação e build) e 140 testes de integração aprovados.
+As notas "Parcial" abaixo indicam o que já existe e o que falta; checkbox aberto
+não significa ausência de implementação.
+
+Etapa entregue nas tarefas 10, 11 e 39: exclusividade após disparo com resposta
+perdida e vínculo manual da workflow sem repetir o envio. Essas tarefas continuam
+abertas para a integração real do runner e a recuperação completa na inicialização.
+[Plano e evidências desta etapa](docs/recuperacao-disparo.md).
 
 ## Fundação
 
 - [x] 1. Criar workspace pnpm com `web` e `backend`, TypeScript estrito, Node 22 e scripts de lint, formatação e teste.
   - Requisitos: R25.
 - [ ] 2. Criar uma configuração validada do sistema-alvo, `.env.example`, `resolva.config.example.json`, `.gitignore` e limites de caminhos, comandos, pipeline e modelo.
-  - Parcial: configuração estrutural, limites, caminhos e comandos já existem; vínculo da chave ao ticket e snapshot versionado ainda pendentes.
+  - Parcial: configuração estrutural, limites, caminhos, comandos e snapshot versionado vinculado ao ticket existem. Revalidação operacional completa e integração com a pipeline real permanecem pendentes nas tarefas 38–39. [Evidências](docs/configuracao-persistencia.md).
   - Requisitos: R08, R13, R24, R25, R33, R34, R37.
 - [x] 3. Criar Docker Compose do PostgreSQL com volume nomeado, healthcheck e porta local configurável.
   - Requisitos: R01, R23.
-- [ ] 4. Configurar Drizzle, conexão, migrações e schema inicial sem segredos, incluindo a configuração do sistema-alvo e seu vínculo versionado ao ticket.
+- [x] 4. Configurar Drizzle, conexão, migrações e schema inicial sem segredos, incluindo a configuração do sistema-alvo e seu vínculo versionado ao ticket.
+  - Conexão, migrações, sete tabelas, FKs, exclusividade e configuração/snapshot versionados no ticket, verificados na suíte PostgreSQL. Integração operacional da configuração pertence à tarefa 38. [Evidências](docs/configuracao-persistencia.md).
   - Requisitos: R01, R04, R05, R21, R23, R24, R33, R34, R37.
 
 ## Domínio e backend
@@ -42,28 +54,34 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
   - Parcial: contratos públicos, validação de conteúdo, categorias, erros, transições humanas, decisão de triagem e elegibilidade implementados. Ajustes de PR dependem dos modos de execução da tarefa 19.
   - Requisitos: R01, R02, R04, R10, R11, R19, R20, R26, R27, R29, R30, R31, R32, R33, R34, R35, R37.
 - [ ] 6. Implementar repositories transacionais para tickets, triagens, eventos, fila, execuções, entregas e artefatos, incluindo pipeline e Pull Request.
-  - Parcial: tickets, histórico, controle de versão e invalidação atômica da triagem; leitura de resumos de execução/entrega. Reservas de implementação, pipeline e demais repositories pendentes.
+  - Parcial: tickets, triagens, fila, reservas, entregas iniciais, eventos e evidências internas persistidos com controle de versão, idempotência e rollback. Ciclo completo de publicação, modos de ajuste/retry e recuperação de todas as falhas permanecem pendentes. [Evidências](docs/conclusao-implementacao.md).
   - Requisitos: R01, R04, R05, R06, R07, R10, R11, R16, R18, R19, R20, R21, R23, R28, R30, R31, R32, R33, R34, R36, R37.
 - [ ] 7. Implementar procedures tRPC de tickets, configuração e triagem, com paginação, busca literal, seleção do sistema-alvo, controle de versão, mensagens, contestação, complementação e histórico.
-  - Parcial: nove procedures de tickets implementadas com contratos de entrada/saída e testes HTTP. Seleção da configuração, fila, início de implementação e ajustes de PR permanecem pendentes.
+  - Parcial: procedures de tickets, seleção validada da configuração única, triagem, contestação, complementação e histórico disponíveis. Fila/início de implementação estão nas procedures da tarefa 8; configuração pública do ambiente e ajustes de PR permanecem pendentes. [Evidências](docs/tickets-api.md).
   - Requisitos: R01, R02, R03, R04, R10, R11, R17, R19, R20, R26, R27, R31, R32, R33, R34.
 - [ ] 8. Implementar procedures tRPC de triagem, fila, implementação e ambiente, incluindo seleção da configuração do ticket, idempotência por `requestKey`, validação de elegibilidade e disparo manual da pipeline CI.
+  - Parcial: triagem, fila, início, consultas, callback e reconciliação manual disponíveis, com idempotência/validação transacional e cliente `gh` falso em testes. Procedures públicas de ambiente e integração operacional completa permanecem pendentes. [Evidências](docs/conclusao-implementacao.md).
   - Requisitos: R05, R06, R07, R08, R21, R23, R28, R29, R30, R32, R33, R34, R35, R37.
 - [ ] 9. Implementar healthcheck, erros públicos de triagem/implementação e validações de ambiente sem stack trace ou segredos.
-  - Parcial: servidor local, healthcheck, bloqueio Host/Origin e erros HTTP/tRPC públicos implementados; configuração do banco ligada ao servidor. Validação das integrações e erros de execução pendentes.
+  - Parcial: servidor local, healthcheck, bloqueio Host/Origin e erros públicos de ticket/triagem/implementação implementados, incluindo indisponibilidade do GitHub sem diagnóstico externo. Disponibilidade pública do ambiente e ensaios reais das integrações permanecem pendentes.
   - Requisitos: R08, R21, R24, R29, R30, R32.
 
 ## Executor controlado
 
 - [ ] 10. Implementar exclusividade global, reserva, idempotência e recuperação de execuções/pipelines interrompidas.
+  - Parcial: guarda/recuperação locais, reservas globais/idempotentes, checkpoint e recuperação manual do disparo incerto implementados e testados. Ligação completa da recuperação à inicialização da API e descoberta automática de runs permanecem pendentes. [Evidências](docs/recuperacao-disparo.md).
   - Requisitos: R06, R07, R22, R23, R28, R29.
 - [ ] 11. Implementar cliente de pipeline CI com argumentos/variáveis validados, timeout, autenticação isolada e encerramento/reconciliação da chamada externa.
+  - Parcial: cliente CI e `gh` com argumentos separados, timeout, ambiente mínimo, consulta da definição da workflow, checkpoint e reconciliação manual do disparo incerto disponíveis. Integração autenticada real e encerramento/recuperação completos permanecem pendentes. [Evidências](docs/recuperacao-disparo.md).
   - Requisitos: R08, R13, R22, R23, R35, R37.
 - [ ] 12. Implementar captura limitada, sanitização de segredos, callback, artefatos e eventos com sequência.
+  - Parcial: captura/sanitização, callback idempotente, sequência de eventos e metadados de evidência disponíveis. Coleta real dos relatórios e consulta pública completa de eventos/artefatos permanecem pendentes. [Evidências](docs/conclusao-implementacao.md).
   - Requisitos: R21, R22, R24, R35, R36.
 - [ ] 13. Definir manifesto de fontes/testes, relatório de validação e adaptador `vitest-json` usados pela pipeline CI.
+  - Parcial: manifesto, hashes, parser `vitest-json` e validação local implementados e testados. A ligação desses contratos à pipeline real permanece pendente.
   - Requisitos: R09, R12, R13, R14, R26, R28, R32, R35.
 - [ ] 14. Implementar integração com a pipeline CI, prompts de triagem e implementação, relatórios JSON versionados, callback e reconciliação da execução Kiro headless.
+  - Parcial: prompt de triagem, relatórios de triagem/execução, eventos, callback e confirmação de conclusão disponíveis com processos/GitHub falsos. Coleta real, prompts/fases completos da implementação e Kiro headless autenticado permanecem pendentes.
   - Requisitos: R08, R09, R10, R12, R14, R21, R24, R26, R27, R28, R32, R34, R35, R37.
 - [ ] 15. Implementar triagem somente leitura e fases de implementação para bugs e melhorias, disparadas pela pipeline CI, com limite máximo de três rodadas de correção e snapshot imutável da configuração do sistema-alvo.
   - Requisitos: R05, R09, R10, R12, R13, R14, R26, R27, R28, R29, R30, R32, R34, R35.
@@ -73,8 +91,10 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
 - [ ] 16. Implementar cópia de trabalho derivada da configuração do ticket, validação de caminhos, diff, arquivos sensíveis, limites e SHA validado.
   - Requisitos: R13, R15, R18, R24, R34, R37.
 - [ ] 17. Implementar disparo da pipeline CI com argumentos/variáveis validados, credencial isolada, branch e commit no repositório configurado.
+  - Parcial: disparo `gh` e reserva da branch/entrega antes do envio implementados em testes. Checkout, commit e publicação controlados na pipeline real permanecem pendentes.
   - Requisitos: R15, R18, R24, R25, R34, R35.
 - [ ] 18. Implementar criação, atualização e reconciliação idempotente de Pull Request vinculada ao ticket, sem force push.
+  - Parcial: cliente de criação/reuso e confirmação de PR por marcador, branches e SHA disponíveis; callback e reconciliação manual de sucesso ligados à persistência. Publicação controlada, atualização e todos os modos da entrega permanecem pendentes. [Evidências](docs/conclusao-implementacao.md).
   - Requisitos: R15, R16, R17, R18, R36.
 - [ ] 19. Implementar modos `initial`, `retry`, `review_behavior` e `review_refinement`, preservando entregas e execuções.
   - Requisitos: R16, R17, R18, R20.
@@ -119,17 +139,17 @@ As tarefas seguem dependências por fatia vertical. Cada tarefa deve atualizar t
 
 ## Extensão de triagem e fila — tarefas 32–37
 
-As tarefas 1–31 permanecem preservadas. As tarefas abaixo tornam explícita a separação entre triagem e implementação; são planejamento, não execução.
+As tarefas 1–31 permanecem preservadas. As tarefas abaixo tornam explícita a separação entre triagem e implementação; o estado da execução está nos checkboxes, notas e evidências de cada item.
 
 - [x] 32. Definir `TriageClassification`, `ExecutionKind`, estados do ticket, validade por `ticketVersion` e regras de elegibilidade para `bug` e `melhoria`.
-  - Funções puras e contratos em `domain/contracts.ts`, `domain/triage.ts` e `domain/ticket.ts`; inclui hashes das fontes, critérios, ambiente e exclusividade. Ainda sem acionamento de IA ou implementação pela API.
+  - Funções puras e contratos em `domain/contracts.ts`, `domain/triage.ts` e `domain/ticket.ts`; inclui hashes das fontes, critérios, ambiente e exclusividade. Uso pelas APIs implementado nas entregas posteriores; execução autenticada da IA é verificada separadamente.
   - Requisitos: R04, R05, R26–R32.
 - [x] 33. Persistir triagens, fontes, hashes, mensagens, contestação, snapshots e invalidação sem apagar conclusões anteriores.
   - Reserva idempotente e conclusão transacional com histórico e recuperação de falhas tratadas. Cobertura HTTP/PostgreSQL em `backend/src/trpc/triages.integration.test.ts`.
-  - Validação com `pnpm check` e `pnpm test:integration` aprovados, com 195 unitários e 41 testes de integração. Dez casos de triagem cobrem concorrência, replay, snapshots, histórico, falhas e consultas com executor falso.
+  - Na entrega original, `pnpm check` e `pnpm test:integration` passaram com 195 unitários e 41 testes de integração. Dez casos de triagem cobrem concorrência, replay, snapshots, histórico, falhas e consultas com executor falso; os totais atuais estão no resumo deste plano.
   - Requisitos: R05, R07, R10, R11, R21, R31, R32.
-- [ ] 34. Expor `triages.start`, `triages.byId`, `triages.list`, `tickets.contestTriage`, `implementations.queue` e `implementations.start` com Zod, idempotência e validação transacional.
-  - Parcial: procedures de triagem e contestação disponíveis. O início requer um executor injetado, exercitado com integração falsa. Fila e início de implementação pendentes.
+- [x] 34. Expor `triages.start`, `triages.byId`, `triages.list`, `tickets.contestTriage`, `implementations.queue` e `implementations.start` com Zod, idempotência e validação transacional.
+  - Todas as procedures listadas estão disponíveis com Zod, idempotência e validação transacional, verificadas por HTTP/PostgreSQL com executor/integração falsos. Execução real da IA/pipeline é escopo das tarefas 35 e 39. [Evidências de triagem](docs/triagem-dominio.md) e [implementação](docs/conclusao-implementacao.md).
   - Requisitos: R05–R08, R26–R32.
 - [ ] 35. Criar prompt de triagem somente leitura, relatório estruturado das cinco classificações e integração com a pipeline CI sem edição, Git ou GitHub durante a triagem.
   - Parcial: configuração por execução, prompt e verificação de identidade, fontes, hashes e relatório v1 integrados com processo simulado. A política efetiva e o uso autenticado permanecem em [ensaio de compatibilidade](docs/kiro-compatibility.md).
@@ -137,12 +157,13 @@ As tarefas 1–31 permanecem preservadas. As tarefas abaixo tornam explícita a 
 - [ ] 36. Implementar na interface a distinção entre `Analisar ticket` e `Iniciar implementação`, fila persistida, mensagens de decisão, contestação e triagem desatualizada.
   - Requisitos: R21, R26–R32.
 - [ ] 37. Cobrir os dez cenários de triagem e elegibilidade com testes de domínio, repository, API, executor e interface, usando fakes e recursos descartáveis.
-  - Parcial: classificação, perguntas, contradição, validade, elegibilidade e transições cobertos no domínio. Cenários completos de persistência, idempotência, executor e interface permanecem pendentes.
+  - Parcial: domínio, persistência, idempotência, reservas, consultas e cenários HTTP de triagem/implementação cobertos com fakes/PostgreSQL descartável. Orquestração completa do executor e cenários de interface permanecem pendentes.
   - Requisitos: R06–R12, R21, R26–R32.
 - [ ] 38. Implementar a configuração única do sistema-alvo selecionável no ticket, snapshot versionado e bloqueio por configuração ausente ou divergente.
-  - Parcial: chave, versão, hash e snapshot imutável são validados e persistidos no ticket; criação/edição bloqueia configuração ausente ou chave divergente. O bloqueio transacional do início da implementação permanece pendente junto do serviço de implementação.
+  - Parcial: chave, versão, hash e snapshot imutável são validados e persistidos no ticket; criação/edição bloqueia configuração ausente ou chave divergente. O serviço de implementação já existe, mas a comparação transacional completa com a configuração atual antes dos efeitos externos permanece pendente.
   - Requisitos: R33, R34, R37.
 - [ ] 39. Integrar o início da implementação ao disparo de uma pipeline CI, enviando somente o snapshot do ticket, configuração, contexto necessário e `executionId`; a pipeline executa o Kiro CLI headless e devolve relatório/callback validado.
+  - Parcial: disparo manual com identidade da execução/entrega, checkpoint, recuperação manual do disparo incerto, callback, evidência interna e confirmação remota disponíveis em testes. Transporte/coleta real dos snapshots e relatórios e execução Kiro headless permanecem pendentes. [Evidências](docs/recuperacao-disparo.md).
   - Requisitos: R08, R12–R16, R24, R30, R34, R35.
 - [ ] 40. Criar e reconciliar a Pull Request do sistema-alvo configurado no ticket, vinculando pipeline, execução, SHA validado e histórico sem duplicação.
   - Parcial: entrega reservada antes do disparo, evidência interna persistida, confirmação por workflow/PR/branch/marcador/SHA ligada ao callback e reconciliação manual pela API, com testes falsos e PostgreSQL descartável. Coleta real dos relatórios, publicação controlada e modos de ajuste/retry permanecem pendentes. [Escopo e evidências](docs/conclusao-implementacao.md).
@@ -231,7 +252,7 @@ Caminhos nesta tabela são entregáveis futuros. Requisitos completos continuam 
 
 ### Ciclos de implementação e aceite
 
-Todos os passos abaixo são futuros. Testes de cada componente pertencem à mesma entrega do código; tarefas 26–29 não autorizam deixá-los para o fim. Executar primeiro o teste significativo e observar falha de comportamento/ausência da implementação, implementar e reexecutar. Não fabricar falha de ferramenta como teste vermelho de negócio.
+O detalhamento abaixo preserva a decomposição original por ciclos; o estado consolidado está nos itens 1–40 e suas evidências. Testes de cada componente pertencem à mesma entrega do código; tarefas 26–29 não autorizam deixá-los para o fim. Executar primeiro o teste significativo e observar falha de comportamento/ausência da implementação, implementar e reexecutar. Não fabricar falha de ferramenta como teste vermelho de negócio.
 
 #### E1 — fundação e tickets (1, 3–7, 9, 26)
 

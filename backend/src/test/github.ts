@@ -10,6 +10,8 @@ export function githubWorkflowRun() {
     head_branch: "main",
     head_sha: "b".repeat(40),
     repository: { full_name: "equipe/alvo" },
+    display_title: "Resolva 11111111-1111-4111-8111-111111111111",
+    created_at: "2026-11-11T00:00:00.000Z",
   };
 }
 

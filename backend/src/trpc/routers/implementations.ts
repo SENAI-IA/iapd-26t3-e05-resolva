@@ -10,6 +10,10 @@ import {
   startImplementationSchema,
 } from "../../domain/implementationContracts.js";
 import { pipelineCallbackSchema } from "../../integrations/ci/callback.js";
+import {
+  dispatchReconciliationInputSchema,
+  dispatchReconciliationResultSchema,
+} from "../../domain/implementationDispatch.js";
 import { implementationProcedure, router } from "../core.js";
 
 export const implementationsRouter = router({
@@ -29,6 +33,10 @@ export const implementationsRouter = router({
     .input(implementationIdentitySchema)
     .output(implementationCallbackResultSchema)
     .mutation(({ ctx, input }) => ctx.implementations.reconcile(input.executionId)),
+  reconcileDispatch: implementationProcedure
+    .input(dispatchReconciliationInputSchema)
+    .output(dispatchReconciliationResultSchema)
+    .mutation(({ ctx, input }) => ctx.implementations.reconcileDispatch(input)),
   list: implementationProcedure
     .input(implementationListInputSchema.optional())
     .output(implementationListSchema)

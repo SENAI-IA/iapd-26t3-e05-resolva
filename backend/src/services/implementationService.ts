@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GithubCliError, type GithubClient } from "../integrations/github/cli.js";
+import { type GithubClient } from "../integrations/github/cli.js";
 import { DeliveryConfirmationError } from "../integrations/github/confirmation.js";
 import type { PipelineCallback } from "../integrations/ci/callback.js";
 import { DomainError } from "../domain/error.js";
@@ -12,6 +12,10 @@ import {
   type StartImplementationInput,
 } from "../domain/implementationContracts.js";
 import type { ImplementationRepository } from "../repository/implementationRepository.js";
+import {
+  assertWorkflowMatchesDispatch,
+  type DispatchReconciliationInput,
+} from "../domain/implementationDispatch.js";
 
 const workflowConfigSchema = z.object({
   repository: z.string().min(1),
@@ -41,6 +45,7 @@ export function createImplementationService(
         repository: context.expected.repository,
         workflowId: callback.workflowId,
       });
+      if (context.dispatch) assertWorkflowMatchesDispatch(context.dispatch, workflow);
       if (
         workflow.status !== "completed" ||
         workflow.conclusion !== "success" ||
@@ -63,6 +68,7 @@ export function createImplementationService(
     return repository.applyPipelineCallback(callback, {
       callbackFingerprint: context.callbackFingerprint,
       validationFingerprint: context.validationFingerprint,
+      dispatchFingerprint: context.dispatch?.checkpointFingerprint ?? null,
       workflowId: callback.workflowId,
       workflowDefinitionId: context.workflowDefinitionId,
       workflowAttempt: context.workflowAttempt,
@@ -75,12 +81,17 @@ export function createImplementationService(
     try {
       const availability = await github.checkAvailability();
       if (!availability.installed)
-        throw new Error("Instale o GitHub CLI (gh) na máquina da aplicação.");
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "Instale o GitHub CLI (gh) na máquina da aplicação.",
+        );
       if (!availability.authenticated)
-        throw new Error("Autentique o GitHub CLI (gh) na máquina da aplicação.");
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "Autentique o GitHub CLI (gh) na máquina da aplicação.",
+        );
     } catch (error) {
-      if (error instanceof GithubCliError || error instanceof Error)
-        throw new DomainError("PRECONDITION_FAILED", error.message);
+      if (error instanceof DomainError) throw error;
       throw new DomainError("PRECONDITION_FAILED", "Não foi possível validar o GitHub CLI.");
     }
   }
@@ -99,11 +110,36 @@ export function createImplementationService(
         "A configuração da execução não pode disparar a workflow.",
       );
     }
+    let workflowDefinitionId: string;
     try {
       await assertGithubAvailability();
-      await github.triggerWorkflow({
+      const definition = await github.getWorkflowDefinition({
         repository: config.data.repository,
         workflow: config.data.workflowRef,
+      });
+      if (definition.state !== "active")
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "A workflow configurada não está ativa no GitHub.",
+        );
+      const checkpoint = await repository.beginWorkflowDispatch(reservation.executionId, {
+        id: definition.id,
+        path: definition.path,
+      });
+      if (!checkpoint.applied) return;
+      workflowDefinitionId = definition.id;
+    } catch (error) {
+      await repository.blockWorkflowDispatch(reservation.executionId);
+      if (error instanceof DomainError) throw error;
+      throw new DomainError(
+        "PRECONDITION_FAILED",
+        "Não foi possível validar a workflow antes do disparo.",
+      );
+    }
+    try {
+      await github.triggerWorkflow({
+        repository: config.data.repository,
+        workflow: workflowDefinitionId,
         ref: config.data.baseBranch,
         fields: {
           executionId: reservation.executionId,
@@ -114,12 +150,15 @@ export function createImplementationService(
         },
       });
       await repository.markWorkflowDispatched(reservation.executionId);
-    } catch (error) {
-      await repository.blockWorkflowDispatch(reservation.executionId);
-      if (error instanceof DomainError) throw error;
-      if (error instanceof GithubCliError || error instanceof Error)
-        throw new DomainError("PRECONDITION_FAILED", error.message);
-      throw new DomainError("PRECONDITION_FAILED", "Não foi possível disparar a workflow.");
+    } catch {
+      const confirmation = await repository.markWorkflowDispatchUnconfirmed(
+        reservation.executionId,
+      );
+      if (confirmation.workflowKnown) return;
+      throw new DomainError(
+        "PRECONDITION_FAILED",
+        "A resposta do disparo não foi confirmada. A implementação permanece ativa para reconciliação.",
+      );
     }
   }
 
@@ -136,6 +175,28 @@ export function createImplementationService(
     applyCallback,
     async reconcile(executionId: string) {
       return applyCallback(await repository.pendingSuccessCallback(executionId));
+    },
+    async reconcileDispatch(input: DispatchReconciliationInput) {
+      const state = await repository.prepareDispatchReconciliation(input);
+      if (state.replay) return state.result;
+      if (!github)
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "Configure o GitHub para reconciliar o disparo.",
+        );
+      let run;
+      try {
+        run = await github.getWorkflowRun({
+          repository: state.context.repository,
+          workflowId: input.workflowId,
+        });
+      } catch {
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "Não foi possível consultar a workflow no GitHub. A execução permanece ativa para reconciliação.",
+        );
+      }
+      return repository.applyDispatchObservation(input, state.context.checkpointFingerprint, run);
     },
     async start(input: StartImplementationInput) {
       const { id, reservation } = await repository.reserve(input, environment);

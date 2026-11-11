@@ -15,6 +15,8 @@ import {
 } from "../integrations/github/contracts.js";
 import type { confirmDelivery } from "../integrations/github/confirmation.js";
 import { lockPipelineCallback, type PipelineCallbackRow } from "./implementationCallback.js";
+import { workflowDispatchConstraints } from "./implementationDispatchRepository.js";
+import { assertEvidenceMatchesDispatch } from "../domain/implementationDispatch.js";
 import {
   nextExecutionSequence,
   validationEvent,
@@ -28,6 +30,7 @@ const configSchema = z.object({
 export type PipelineSuccessProof = {
   callbackFingerprint: string;
   validationFingerprint: string;
+  dispatchFingerprint: string | null;
   workflowId: string;
   workflowDefinitionId: string;
   workflowAttempt: number;
@@ -73,6 +76,8 @@ export async function pipelineSuccessContext(
       "A execução ainda não possui evidências aprovadas pelo executor.",
     );
   const evidence = parsed.data;
+  const dispatch = await workflowDispatchConstraints(tx, row.execution);
+  assertEvidenceMatchesDispatch(evidence, dispatch);
   const fingerprint = evidenceFingerprint(evidence);
   if (
     event?.payload.fingerprint !== fingerprint ||
@@ -117,6 +122,7 @@ export async function pipelineSuccessContext(
       prNumber: callback.pullRequest.number,
     },
     validationFingerprint: fingerprint,
+    dispatch,
     workflowDefinitionId: evidence.workflowDefinitionId,
     workflowAttempt: evidence.workflowAttempt,
   };
@@ -139,6 +145,7 @@ export async function confirmPipelineDelivery(
   if (
     proof.callbackFingerprint !== fingerprint ||
     proof.validationFingerprint !== context.validationFingerprint ||
+    proof.dispatchFingerprint !== (context.dispatch?.checkpointFingerprint ?? null) ||
     proof.workflowId !== callback.workflowId ||
     proof.workflowDefinitionId !== context.workflowDefinitionId ||
     proof.workflowAttempt !== context.workflowAttempt ||

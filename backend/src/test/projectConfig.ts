@@ -4,7 +4,7 @@ export const testTargetConfig = parseProjectConfig({
   targetSystemKey: "demo",
   displayName: "Sistema demo",
   version: 1,
-  workflowRef: "main",
+  workflowRef: "resolva.yml",
   repository: "equipe/alvo",
   baseBranch: "main",
   repositoryRoot: "target",

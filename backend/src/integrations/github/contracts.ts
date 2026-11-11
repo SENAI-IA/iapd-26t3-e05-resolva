@@ -22,6 +22,13 @@ export const githubRunIdSchema = z
   .regex(/^[1-9][0-9]*$/u);
 export const gitShaSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
 export const githubNumberSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+export const githubWorkflowFileSchema = z
+  .string()
+  .regex(/^\.github\/workflows\/[A-Za-z0-9_][A-Za-z0-9._-]{0,200}\.ya?ml$/u);
+export const githubWorkflowSelectorSchema = z.union([
+  githubRunIdSchema,
+  z.string().regex(/^(?:\.github\/workflows\/)?[A-Za-z0-9_][A-Za-z0-9._-]{0,200}\.ya?ml$/u),
+]);
 
 export function sameRepository(left: string, right: string) {
   return left.toLowerCase() === right.toLowerCase();

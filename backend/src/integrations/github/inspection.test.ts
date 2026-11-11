@@ -11,6 +11,60 @@ function clientWithResponse(value: unknown, calls: string[][] = []) {
 }
 
 describe("consultas autenticadas ao GitHub", () => {
+  it.each(["resolva.yml", ".github/workflows/resolva.yml", "456"])(
+    "resolve definição da workflow %s sem confundir com o run",
+    async (workflow) => {
+      const calls: string[][] = [];
+      const client = clientWithResponse(
+        {
+          id: 456,
+          path: ".github/workflows/resolva.yml",
+          state: "active",
+          url: "https://api.github.com/repos/equipe/alvo/actions/workflows/456",
+        },
+        calls,
+      );
+      await expect(
+        client.getWorkflowDefinition({ repository: "equipe/alvo", workflow }),
+      ).resolves.toEqual({ id: "456", path: ".github/workflows/resolva.yml", state: "active" });
+      expect(calls[0]).toEqual([
+        "api",
+        "--hostname",
+        "github.com",
+        "--method",
+        "GET",
+        `repos/equipe/alvo/actions/workflows/${workflow === "456" ? "456" : "resolva.yml"}`,
+      ]);
+    },
+  );
+
+  it.each([
+    { id: 457 },
+    { path: ".github/workflows/outro.yml" },
+    { url: "https://api.github.com/repos/outro/alvo/actions/workflows/456" },
+    { url: "https://token@api.github.com/repos/equipe/alvo/actions/workflows/456" },
+  ])("recusa definição com identidade divergente: %j", async (overrides) => {
+    const client = clientWithResponse({
+      id: 456,
+      path: ".github/workflows/resolva.yml",
+      state: "active",
+      url: "https://api.github.com/repos/equipe/alvo/actions/workflows/456",
+      ...overrides,
+    });
+    await expect(
+      client.getWorkflowDefinition({ repository: "equipe/alvo", workflow: "resolva.yml" }),
+    ).rejects.toMatchObject({ reason: "invalid_response" });
+  });
+
+  it("recusa seletor de workflow que não identifica arquivo ou ID", async () => {
+    const calls: string[][] = [];
+    const client = clientWithResponse({}, calls);
+    await expect(
+      client.getWorkflowDefinition({ repository: "equipe/alvo", workflow: "../resolva.yml" }),
+    ).rejects.toThrow();
+    expect(calls).toEqual([]);
+  });
+
   it("consulta workflow por identidade com GET no host fixo", async () => {
     const calls: string[][] = [];
     const client = clientWithResponse(githubWorkflowRun(), calls);
@@ -27,6 +81,8 @@ describe("consultas autenticadas ao GitHub", () => {
       headBranch: "main",
       headSha: "b".repeat(40),
       repository: "equipe/alvo",
+      displayTitle: "Resolva 11111111-1111-4111-8111-111111111111",
+      createdAt: "2026-11-11T00:00:00.000Z",
     });
     expect(calls).toEqual([
       [

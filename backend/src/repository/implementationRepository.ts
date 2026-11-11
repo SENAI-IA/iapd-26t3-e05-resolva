@@ -33,6 +33,11 @@ import { transitionTicket } from "../domain/ticket.js";
 import { toTicket } from "./ticketRepository.js";
 import { createImplementationEvidenceRepository } from "./implementationEvidenceRepository.js";
 import { nextExecutionSequence } from "./implementationTransactions.js";
+import {
+  createImplementationDispatchRepository,
+  workflowDispatchIntent,
+} from "./implementationDispatchRepository.js";
+import { createImplementationDispatchReconciliation } from "./implementationDispatchReconciliation.js";
 import { lockPipelineCallback } from "./implementationCallback.js";
 import {
   createImplementationCompletionRepository,
@@ -169,6 +174,8 @@ function assertEligibility(
 export function createImplementationRepository(database: AppDatabase) {
   return {
     ...createImplementationEvidenceRepository(database),
+    ...createImplementationDispatchRepository(database),
+    ...createImplementationDispatchReconciliation(database),
     ...createImplementationCompletionRepository(database),
     async queue(
       input: ImplementationQueueInput,
@@ -313,8 +320,9 @@ export function createImplementationRepository(database: AppDatabase) {
         if (!row || row.execution.kind !== "implementation")
           throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
         if (row.execution.status !== "em_andamento" || row.execution.workflowId !== null) return;
+        if (await workflowDispatchIntent(tx, executionId)) return;
         const message =
-          "A workflow não pôde ser confirmada. Faça uma nova triagem antes de tentar novamente.";
+          "A workflow não foi disparada. Revise a configuração e o ambiente antes de tentar novamente.";
         await tx
           .update(executions)
           .set({
@@ -340,7 +348,7 @@ export function createImplementationRepository(database: AppDatabase) {
         });
         await tx.insert(executionEvents).values({
           executionId,
-          sequence: 2,
+          sequence: await nextExecutionSequence(tx, executionId),
           type: "blocked",
           stage: "preparando_ambiente",
           message,

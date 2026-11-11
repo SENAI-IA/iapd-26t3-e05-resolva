@@ -105,7 +105,7 @@ O adaptador de triagem prepara um workspace descartável, gera o perfil Kiro V3 
 ## Callback de implementação
 
 O backend também expõe `implementations.queue`, `start`, `list`, `byId` e
-`callback` e `reconcile`. O início padrão continua bloqueado até a integração do ambiente.
+`callback`, `reconcile` e `reconcileDispatch`. O início padrão continua bloqueado até a integração do ambiente.
 Callbacks são validados contra o snapshot da execução, vinculam um único workflow
 e ignoram mensagens já aplicadas, inclusive após a conclusão. A migração
 `0002_identidade_workflow.sql` preserva a identidade de workflows existentes.
@@ -128,6 +128,20 @@ A operação só consulta e confirma; não dispara workflow nem publica outra PR
 Sem proposta ou evidência suficiente, retorna uma precondição explícita e mantém
 a exclusividade da execução. Repetições após a conclusão são inócuas, mesmo sem
 GitHub disponível. [Contratos e evidências da conclusão](.kiro/specs/resolva-mvp/docs/conclusao-implementacao.md).
+
+O disparo grava um checkpoint antes de chamar o `gh`. Timeout ou perda da resposta
+depois desse ponto mantém a execução ativa; repetir a `requestKey` não envia outra
+workflow. `implementations.reconcileDispatch({ executionId, workflowId })` permite
+informar o ID do run visto no GitHub para conferir e persistir seu vínculo. A
+operação faz apenas leitura remota; sucesso da workflow continua aguardando
+relatório/evidência, enquanto falha ou cancelamento confirmados podem encerrar a
+execução. Erro de consulta não comprova ausência e não libera a exclusividade.
+
+`workflowRef` deve identificar o arquivo YAML ou o ID numérico da workflow;
+`baseBranch` indica a branch Git. O exemplo usa `resolva.yml`. A workflow alvo
+precisa definir `run-name: Resolva ${{ inputs.executionId }}` para a correlação
+autenticada do run com a intenção registrada.
+[Operação e limites da recuperação](.kiro/specs/resolva-mvp/docs/recuperacao-disparo.md).
 
 ## Configuração do projeto-alvo
 

@@ -10,6 +10,7 @@ Estas regras são a configuração ativa do Kiro IDE para o repositório Resolva
 
 - Escrever documentação, mensagens da interface e mensagens de commit em português.
 - Usar commits convencionais, curtos e focados em uma mudança.
+- Não incluir ID de task nem placeholder nas mensagens de commit; não solicitar esse dado antes de commitar.
 - Preservar histórico, branches e revisão humana.
 - O executor não faz merge, deploy nem alterações em dados de produção.
 

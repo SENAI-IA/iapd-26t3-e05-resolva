@@ -250,6 +250,72 @@ export function createImplementationRepository(database: AppDatabase) {
       });
     },
 
+    async markWorkflowDispatched(executionId: string) {
+      await database.db.transaction(async (tx) => {
+        const [execution] = await tx
+          .select({ id: executions.id, status: executions.status })
+          .from(executions)
+          .where(eq(executions.id, executionId))
+          .for("update");
+        if (!execution)
+          throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+        if (execution.status !== "em_andamento") return;
+        await tx.insert(executionEvents).values({
+          executionId,
+          sequence: 2,
+          type: "workflow_dispatched",
+          stage: "preparando_ambiente",
+          message: "Workflow de implementação disparada.",
+        });
+      });
+    },
+
+    async blockWorkflowDispatch(executionId: string) {
+      await database.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ execution: executions, ticket: tickets })
+          .from(executions)
+          .innerJoin(tickets, eq(tickets.id, executions.ticketId))
+          .where(eq(executions.id, executionId))
+          .for("update");
+        if (!row || row.execution.kind !== "implementation")
+          throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+        if (row.execution.status !== "em_andamento") return;
+        const message =
+          "A workflow não pôde ser confirmada. Faça uma nova triagem antes de tentar novamente.";
+        await tx
+          .update(executions)
+          .set({
+            status: "bloqueada",
+            blockerCode: "WORKFLOW_DISPATCH_FAILED",
+            blockerMessage: message,
+            outcome: "workflow_dispatch_failed",
+            completedAt: sql`clock_timestamp()`,
+          })
+          .where(eq(executions.id, executionId));
+        await tx
+          .update(tickets)
+          .set({ status: "aberto", updatedAt: sql`clock_timestamp()` })
+          .where(eq(tickets.id, row.ticket.id));
+        await tx.insert(ticketEvents).values({
+          ticketId: row.ticket.id,
+          type: "implementation_blocked",
+          fromStatus: row.ticket.status,
+          toStatus: "aberto",
+          message,
+          payload: { executionId, version: row.execution.ticketVersion },
+          createdAt: sql`clock_timestamp()`,
+        });
+        await tx.insert(executionEvents).values({
+          executionId,
+          sequence: 2,
+          type: "blocked",
+          stage: "preparando_ambiente",
+          message,
+        });
+      });
+    },
+
     async reserve(input: StartImplementationInput, environment: RuntimeEnvironment) {
       return database.db.transaction(async (tx) => {
         const [existing] = await tx

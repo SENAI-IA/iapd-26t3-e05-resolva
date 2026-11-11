@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createGithubClient, type GhExecution } from "../integrations/github/cli.js";
+import { createImplementationService } from "../services/implementationService.js";
 import {
   implementationListInputSchema,
   implementationQueueInputSchema,
@@ -152,5 +154,79 @@ describe("implementação transacional", () => {
         environment,
       ),
     ).rejects.toMatchObject({ code: "CONFLICT", activeExecutionId: expect.any(String) });
+  });
+
+  it("dispara a workflow fora da transação e registra o evento de confirmação", async () => {
+    const ticketId = await eligibleTicket();
+    const execute = vi.fn<GhExecution>(async (args) => {
+      if (args[0] === "auth") return { stdout: "", stderr: "" };
+      return { stdout: "", stderr: "" };
+    });
+    const github = createGithubClient({ execute });
+    const service = createImplementationService(repository, environment, github);
+    const input = startImplementationSchema.parse({
+      ticketId,
+      expectedVersion: 1,
+      requestKey: randomUUID(),
+    });
+
+    const result = await service.start(input);
+
+    expect(result.implementationExecutionId).toBeTypeOf("string");
+    expect(execute).toHaveBeenNthCalledWith(
+      3,
+      [
+        "workflow",
+        "run",
+        "main",
+        "--repo",
+        "equipe/alvo",
+        "--ref",
+        "main",
+        "--field",
+        `executionId=${result.implementationExecutionId}`,
+        "--field",
+        `ticketId=${ticketId}`,
+        "--field",
+        "ticketVersion=1",
+      ],
+      expect.anything(),
+    );
+    const events = await resource.database.pool.query(
+      "SELECT sequence,type FROM execution_events WHERE execution_id=$1 ORDER BY sequence",
+      [result.implementationExecutionId],
+    );
+    expect(events.rows).toEqual([
+      { sequence: 1, type: "started" },
+      { sequence: 2, type: "workflow_dispatched" },
+    ]);
+    await expect(service.start(input)).resolves.toEqual(result);
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("bloqueia a execução e devolve o ticket a aberto quando o disparo falha", async () => {
+    const ticketId = await eligibleTicket();
+    const execute = vi.fn<GhExecution>(async (args) => {
+      if (args[0] === "auth") return { stdout: "", stderr: "" };
+      throw new Error("falha externa fictícia");
+    });
+    const github = createGithubClient({ execute });
+    const service = createImplementationService(repository, environment, github);
+    const input = startImplementationSchema.parse({
+      ticketId,
+      expectedVersion: 1,
+      requestKey: randomUUID(),
+    });
+
+    await expect(service.start(input)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("aberto");
+    const execution = await resource.database.pool.query(
+      "SELECT status,blocker_code FROM executions WHERE request_key=$1",
+      [input.requestKey],
+    );
+    expect(execution.rows[0]).toEqual({
+      status: "bloqueada",
+      blocker_code: "WORKFLOW_DISPATCH_FAILED",
+    });
   });
 });

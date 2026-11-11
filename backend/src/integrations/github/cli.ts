@@ -1,30 +1,15 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { hasControlCharacters } from "../../config/strings.js";
+import { githubRepositorySchema, githubBranchSchema } from "./contracts.js";
+import { GithubCliError } from "./error.js";
+import { createGithubInspection } from "./inspection.js";
+import { confirmDelivery, type DeliveryConfirmationInput } from "./confirmation.js";
+
+export { GithubCliError } from "./error.js";
 
 const execFileAsync = promisify(execFile);
-const repositorySchema = z
-  .string()
-  .regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u);
-function hasControlCharacters(value: string) {
-  return [...value].some((character) => {
-    const code = character.charCodeAt(0);
-    return code < 32 || code === 127;
-  });
-}
-
-const branchSchema = z
-  .string()
-  .min(1)
-  .max(255)
-  .refine(
-    (value) =>
-      !hasControlCharacters(value) &&
-      !/\s/u.test(value) &&
-      !["~", "^", ":", "?", "*", "["].some((character) => value.includes(character)) &&
-      !value.includes("\\") &&
-      !value.includes(".."),
-  );
 const pullRequestSchema = z.strictObject({
   number: z.number().int().positive(),
   url: z.url().refine((value) => new URL(value).hostname === "github.com"),
@@ -44,16 +29,6 @@ export type GhExecutionOptions = {
   token?: string;
 };
 export type GhOutput = { stdout: string; stderr: string };
-
-export class GithubCliError extends Error {
-  constructor(
-    public readonly reason: "unavailable" | "timeout" | "failed" | "invalid_response",
-    message: string,
-  ) {
-    super(message);
-    this.name = "GithubCliError";
-  }
-}
 
 function environment(token?: string): NodeJS.ProcessEnv {
   return {
@@ -83,11 +58,11 @@ const defaultExecution: GhExecution = async (args, options) => {
 };
 
 function validateRepository(repository: string) {
-  return repositorySchema.parse(repository);
+  return githubRepositorySchema.parse(repository);
 }
 
 function validateBranch(branch: string) {
-  return branchSchema.parse(branch);
+  return githubBranchSchema.parse(branch);
 }
 
 function parsePullRequests(stdout: string): PullRequestReference[] {
@@ -136,8 +111,13 @@ export function createGithubClient(
     ...(options.token ? { token: options.token } : {}),
   };
   const run = (args: readonly string[]) => execute(args, executionOptions);
+  const inspection = createGithubInspection(run);
 
   return {
+    ...inspection,
+    confirmDelivery(input: DeliveryConfirmationInput) {
+      return confirmDelivery(input, inspection);
+    },
     async checkAvailability() {
       try {
         await run(["--version"]);

@@ -141,6 +141,7 @@ As tarefas 1–31 permanecem preservadas. As tarefas abaixo tornam explícita a 
 - [ ] 39. Integrar o início da implementação ao disparo de uma pipeline CI, enviando somente o snapshot do ticket, configuração, contexto necessário e `executionId`; a pipeline executa o Kiro CLI headless e devolve relatório/callback validado.
   - Requisitos: R08, R12–R16, R24, R30, R34, R35.
 - [ ] 40. Criar e reconciliar a Pull Request do sistema-alvo configurado no ticket, vinculando pipeline, execução, SHA validado e histórico sem duplicação.
+  - Parcial: adaptador de leitura de workflow/PR/branch e confirmação de entrega por repositório, branches, marcador e SHA disponíveis. Persistência prévia de entrega/evidências e coordenação pela API permanecem pendentes. [Escopo e evidências](docs/confirmacao-github.md).
   - Requisitos: R15–R18, R25, R36.
 
 A ordem recomendada passa a ser: fundação e configuração/tickets (1–9, 38), triagem e fila (32–37), integração CI/Kiro (10–15, 39), GitHub/PR (16–19, 40), frontend completo (20–24) e demonstração/qualidade (25–31). Nenhuma implementação é iniciada por esta atualização documental.

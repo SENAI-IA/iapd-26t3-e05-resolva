@@ -112,6 +112,13 @@ e ignoram mensagens já aplicadas, inclusive após a conclusão. A migração
 Confirmação remota de SHA, testes e PR e reconciliação ainda estão pendentes.
 [Detalhes e evidências do callback](.kiro/specs/resolva-mvp/docs/callback-pipeline.md).
 
+O cliente GitHub também oferece consultas de workflow, PR e ponta da branch e
+`confirmDelivery`, que confere uma PR contra repositório, branches, marcador da
+entrega e SHA previamente validado. O adaptador só consulta o GitHub e ainda não
+está conectado ao callback ou às transições da API. Persistência das evidências de
+teste e coordenação da reconciliação permanecem pendentes.
+[Escopo e evidências da confirmação](.kiro/specs/resolva-mvp/docs/confirmacao-github.md).
+
 ## Configuração do projeto-alvo
 
 A configuração de IA é opcional nesta fase. Copie `config/resolva.config.example.json` para `resolva.config.json` na raiz e ajuste repositório, branch, modelo explícito e comandos quando houver um alvo separado. O exemplo espera um checkout em `targets/demo-target`; esse diretório e a configuração local são ignorados pelo Git. `RESOLVA_CONFIG_PATH` permite selecionar outro arquivo.

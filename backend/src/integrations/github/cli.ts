@@ -5,6 +5,7 @@ import { hasControlCharacters } from "../../config/strings.js";
 import { githubRepositorySchema, githubBranchSchema } from "./contracts.js";
 import { GithubCliError } from "./error.js";
 import { createGithubInspection } from "./inspection.js";
+import { createGithubArtifacts, maximumReportArchiveBytes } from "./artifacts.js";
 import { confirmDelivery, type DeliveryConfirmationInput } from "./confirmation.js";
 
 export { GithubCliError } from "./error.js";
@@ -23,6 +24,10 @@ export type GhExecution = (
   args: readonly string[],
   options: GhExecutionOptions,
 ) => Promise<GhOutput>;
+export type GhBinaryExecution = (
+  args: readonly string[],
+  options: GhExecutionOptions,
+) => Promise<{ stdout: Buffer; stderr: string }>;
 export type GhExecutionOptions = {
   cwd?: string;
   timeoutMs: number;
@@ -48,6 +53,26 @@ const defaultExecution: GhExecution = async (args, options) => {
       shell: false,
     });
     return { stdout: result.stdout, stderr: result.stderr };
+  } catch (error) {
+    if (error instanceof Error && "killed" in error && error.killed)
+      throw new GithubCliError("timeout", "O comando gh excedeu o tempo limite.");
+    if (error instanceof Error && "code" in error && error.code === "ENOENT")
+      throw new GithubCliError("unavailable", "O executável gh não está instalado.");
+    throw new GithubCliError("failed", "O comando gh não pôde concluir a operação.");
+  }
+};
+
+const defaultBinaryExecution: GhBinaryExecution = async (args, options) => {
+  try {
+    const result = await execFileAsync("gh", [...args], {
+      cwd: options.cwd,
+      env: environment(options.token),
+      timeout: options.timeoutMs,
+      maxBuffer: maximumReportArchiveBytes,
+      encoding: "buffer",
+      shell: false,
+    });
+    return { stdout: result.stdout, stderr: result.stderr.toString("utf8") };
   } catch (error) {
     if (error instanceof Error && "killed" in error && error.killed)
       throw new GithubCliError("timeout", "O comando gh excedeu o tempo limite.");
@@ -99,12 +124,20 @@ export function createGithubClient(
     token?: string;
     timeoutMs?: number;
     execute?: GhExecution;
+    executeBinary?: GhBinaryExecution;
   } = {},
 ) {
   const timeoutMs = options.timeoutMs ?? 30_000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 300_000)
     throw new Error("O timeout do gh deve estar entre 1 e 300 segundos.");
   const execute = options.execute ?? defaultExecution;
+  const executeBinary =
+    options.executeBinary ??
+    (options.execute
+      ? async () => {
+          throw new GithubCliError("failed", "O executor binário do gh não foi configurado.");
+        }
+      : defaultBinaryExecution);
   const executionOptions: GhExecutionOptions = {
     timeoutMs,
     ...(options.cwd ? { cwd: options.cwd } : {}),
@@ -115,6 +148,7 @@ export function createGithubClient(
 
   return {
     ...inspection,
+    ...createGithubArtifacts(run, (args) => executeBinary(args, executionOptions)),
     confirmDelivery(input: DeliveryConfirmationInput) {
       return confirmDelivery(input, inspection);
     },

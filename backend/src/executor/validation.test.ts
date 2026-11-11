@@ -120,6 +120,44 @@ describe("adaptador vitest-json", () => {
     });
   });
 
+  it("não trata exit code de erro do runner como reprodução mesmo havendo asserção falha", () => {
+    const raw = report({
+      numPassedTests: 1,
+      numFailedTests: 1,
+      testResults: [
+        {
+          name: "tests/total.test.ts",
+          assertionResults: [
+            { status: "failed", title: "quantidade", failureMessages: ["Esperado 2500"] },
+          ],
+        },
+      ],
+    });
+    expect(normalizeValidationResult({ exitCode: 2, report: raw })).toMatchObject({
+      status: "runner_failed",
+    });
+  });
+
+  it("não aceita falha de módulo ou hook como asserção do teste", () => {
+    const raw = report({
+      numPassedTests: 1,
+      numFailedTests: 1,
+      testResults: [
+        {
+          name: "tests/total.test.ts",
+          status: "failed",
+          message: "Falha no afterAll",
+          assertionResults: [
+            { status: "failed", title: "quantidade", failureMessages: ["Esperado 2500"] },
+          ],
+        },
+      ],
+    });
+    expect(normalizeValidationResult({ exitCode: 1, report: raw })).toMatchObject({
+      status: "runner_failed",
+    });
+  });
+
   it("recusa JSON ausente, inválido ou inconsistente", () => {
     expect(() => parseVitestJson("não é JSON")).toThrow(ValidationReportError);
     expect(() => parseVitestJson(JSON.stringify({}))).toThrow("Relatório de testes inválido.");

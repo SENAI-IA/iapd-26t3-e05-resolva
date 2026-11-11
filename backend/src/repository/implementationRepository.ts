@@ -38,6 +38,7 @@ import {
   workflowDispatchIntent,
 } from "./implementationDispatchRepository.js";
 import { createImplementationDispatchReconciliation } from "./implementationDispatchReconciliation.js";
+import { createImplementationReportRepository } from "./implementationReportRepository.js";
 import { lockPipelineCallback } from "./implementationCallback.js";
 import {
   createImplementationCompletionRepository,
@@ -176,6 +177,7 @@ export function createImplementationRepository(database: AppDatabase) {
     ...createImplementationEvidenceRepository(database),
     ...createImplementationDispatchRepository(database),
     ...createImplementationDispatchReconciliation(database),
+    ...createImplementationReportRepository(database),
     ...createImplementationCompletionRepository(database),
     async queue(
       input: ImplementationQueueInput,

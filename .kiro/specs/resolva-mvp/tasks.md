@@ -35,6 +35,12 @@ perdida e vínculo manual da workflow sem repetir o envio. Essas tarefas continu
 abertas para a integração real do runner e a recuperação completa na inicialização.
 [Plano e evidências desta etapa](docs/recuperacao-disparo.md).
 
+Em andamento nas tarefas 12–14 e 39: coleta autenticada do artefato de relatório,
+validação dos testes e persistência sanitizada antes da conclusão. O consumidor local
+está implementado e validado com fakes e PostgreSQL descartável; a workflow produtora,
+o transporte real dos snapshots/relatórios e o ensaio Kiro continuam pendentes.
+[Plano e evidências](docs/coleta-relatorios.md).
+
 ## Fundação
 
 - [x] 1. Criar workspace pnpm com `web` e `backend`, TypeScript estrito, Node 22 e scripts de lint, formatação e teste.

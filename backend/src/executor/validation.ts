@@ -17,6 +17,7 @@ const testFileSchema = z.object({
   name: z.string().optional(),
   assertionResults: z.array(assertionSchema).default([]),
   failureMessage: z.string().optional(),
+  message: z.string().optional(),
 });
 const vitestReportSchema = z
   .object({
@@ -77,8 +78,12 @@ export function parseVitestJson(raw: string): ValidationResult {
     const report = vitestReportSchema.parse(JSON.parse(raw));
     const failedTests: string[] = [];
     const errors: string[] = [];
+    let runnerError = false;
     for (const file of report.testResults) {
-      if (file.failureMessage) errors.push(file.failureMessage);
+      if (file.failureMessage || file.message) {
+        runnerError = true;
+        errors.push(file.failureMessage || file.message || "Falha no módulo de testes.");
+      }
       for (const assertion of file.assertionResults) {
         if (assertion.status !== "failed") continue;
         failedTests.push(assertionName(file, assertion));
@@ -86,8 +91,9 @@ export function parseVitestJson(raw: string): ValidationResult {
       }
     }
     return {
-      status:
-        report.numTotalTests === 0
+      status: runnerError
+        ? "runner_failed"
+        : report.numTotalTests === 0
           ? "zero_tests"
           : report.numFailedTests > 0
             ? "assertion_failed"
@@ -232,7 +238,8 @@ export function normalizeValidationResult(output: ValidationProcessResult): Vali
     };
   }
   const result = parseVitestJson(output.report);
-  if (result.status === "assertion_failed") return result;
+  if (result.status === "assertion_failed")
+    return output.exitCode === 1 ? result : { ...result, status: "runner_failed" };
   if (output.exitCode !== 0) return { ...result, status: "runner_failed" };
   return result;
 }

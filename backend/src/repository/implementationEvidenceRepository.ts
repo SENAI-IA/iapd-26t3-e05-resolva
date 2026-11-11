@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "../db/index.js";
-import { artifacts, deliveries, executions, executionEvents } from "../db/schema.js";
+import { artifacts, deliveries, executions, executionEvents, tickets } from "../db/schema.js";
 import { DomainError } from "../domain/error.js";
 import {
   evidenceFingerprint,
@@ -10,29 +10,40 @@ import {
 import { nextExecutionSequence, validationEvent } from "./implementationTransactions.js";
 import { workflowDispatchConstraints } from "./implementationDispatchRepository.js";
 import { assertEvidenceMatchesDispatch } from "../domain/implementationDispatch.js";
+import { pipelineReportCollectionState } from "./implementationReportRepository.js";
 
 export function createImplementationEvidenceRepository(database: AppDatabase) {
   return {
-    async recordValidationEvidence(input: unknown) {
+    async recordValidationEvidence(input: unknown, collectionFingerprint?: string) {
       const result = implementationEvidenceSchema.safeParse(input);
       if (!result.success)
         throw new DomainError("BAD_REQUEST", "Evidência de implementação inválida.");
       const evidence = result.data;
       const fingerprint = evidenceFingerprint(evidence);
       return database.db.transaction(async (tx) => {
-        const [execution] = await tx
-          .select()
+        const [row] = await tx
+          .select({ execution: executions, ticket: tickets })
           .from(executions)
+          .innerJoin(tickets, eq(tickets.id, executions.ticketId))
           .where(
             and(eq(executions.id, evidence.executionId), eq(executions.kind, "implementation")),
           )
           .for("update");
+        const execution = row?.execution;
         if (!execution)
           throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
         const previous = await validationEvent(tx, execution.id);
         if (previous) {
           if (previous.payload.fingerprint === fingerprint) return { applied: false, fingerprint };
           throw new DomainError("CONFLICT", "A execução já possui outra evidência aprovada.");
+        }
+        if (collectionFingerprint !== undefined) {
+          const current = await pipelineReportCollectionState(tx, execution.id);
+          if (current.replay || current.fingerprint !== collectionFingerprint)
+            throw new DomainError(
+              "CONFLICT",
+              "O contexto da execução mudou durante a coleta do relatório.",
+            );
         }
         if (execution.status !== "em_andamento")
           throw new DomainError("CONFLICT", "A execução não está ativa para aprovar evidências.");

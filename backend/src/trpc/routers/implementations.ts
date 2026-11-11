@@ -33,6 +33,10 @@ export const implementationsRouter = router({
     .input(implementationIdentitySchema)
     .output(implementationCallbackResultSchema)
     .mutation(({ ctx, input }) => ctx.implementations.reconcile(input.executionId)),
+  collectReport: implementationProcedure
+    .input(implementationIdentitySchema)
+    .output(implementationCallbackResultSchema)
+    .mutation(({ ctx, input }) => ctx.implementations.collectReport(input.executionId)),
   reconcileDispatch: implementationProcedure
     .input(dispatchReconciliationInputSchema)
     .output(dispatchReconciliationResultSchema)

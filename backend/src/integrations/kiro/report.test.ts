@@ -48,6 +48,16 @@ describe("relatório de execução do Kiro", () => {
     ).toMatchObject({ outcome: "needs_information", questions: ["Qual regra deve prevalecer?"] });
   });
 
+  it("aceita relatório de melhoria com teste novo aprovado sem falha de bug inventada", () => {
+    expect(
+      parseRunReport(
+        base({ phase: "fix", round: 1, expectedFailure: null }),
+        { executionId, phase: "fix", round: 1 },
+        { ...context, classification: "melhoria" },
+      ),
+    ).toMatchObject({ outcome: "ready", expectedFailure: null });
+  });
+
   it.each([
     ["identidade incorreta", { executionId: "22222222-2222-4222-8222-222222222222" }],
     ["referência ausente", { references: [{ path: "docs/missing.md", startLine: 1, endLine: 1 }] }],

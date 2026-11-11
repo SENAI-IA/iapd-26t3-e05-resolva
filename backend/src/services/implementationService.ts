@@ -14,8 +14,11 @@ import {
 import type { ImplementationRepository } from "../repository/implementationRepository.js";
 import {
   assertWorkflowMatchesDispatch,
+  assertEvidenceMatchesDispatch,
   type DispatchReconciliationInput,
 } from "../domain/implementationDispatch.js";
+import type { PipelineReportCollector } from "../integrations/ci/collectReport.js";
+import type { ParsedPipelineReport } from "../integrations/ci/report.js";
 
 const workflowConfigSchema = z.object({
   repository: z.string().min(1),
@@ -27,6 +30,7 @@ export function createImplementationService(
   repository: ImplementationRepository,
   environment: Pick<ImplementationEnvironment, "ready" | "sourceHashes">,
   github?: GithubClient,
+  reports?: PipelineReportCollector,
 ) {
   async function applyCallback(callback: PipelineCallback) {
     if (callback.status !== "success") return repository.applyPipelineCallback(callback);
@@ -175,6 +179,60 @@ export function createImplementationService(
     applyCallback,
     async reconcile(executionId: string) {
       return applyCallback(await repository.pendingSuccessCallback(executionId));
+    },
+    async collectReport(executionId: string) {
+      const state = await repository.prepareReportCollection(executionId);
+      if (state.replay) return applyCallback(await repository.pendingSuccessCallback(executionId));
+      if (!reports)
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "Configure a coleta dos relatórios da pipeline.",
+        );
+      let collected: ParsedPipelineReport;
+      try {
+        if (state.cached) {
+          assertEvidenceMatchesDispatch(state.cached, state.dispatch);
+          collected = await reports.readApproved(
+            { ...state.context, workflowAttempt: state.cached.workflowAttempt },
+            state.cached,
+          );
+        } else {
+          if (!github)
+            throw new DomainError(
+              "PRECONDITION_FAILED",
+              "Configure o GitHub para coletar o relatório da pipeline.",
+            );
+          const workflow = await github.getWorkflowRun({
+            repository: state.context.repository,
+            workflowId: state.context.workflowId,
+          });
+          assertWorkflowMatchesDispatch(state.dispatch, workflow);
+          assertEvidenceMatchesDispatch(
+            {
+              workflowDefinitionId: workflow.workflowDefinitionId,
+              workflowAttempt: workflow.attempt,
+            },
+            state.dispatch,
+          );
+          if (workflow.status !== "completed" || workflow.conclusion !== "success")
+            throw new DomainError(
+              "PRECONDITION_FAILED",
+              "A workflow ainda não concluiu com sucesso para coletar evidências.",
+            );
+          collected = await reports.collect(
+            { ...state.context, workflowAttempt: workflow.attempt },
+            github,
+          );
+        }
+      } catch (error) {
+        if (error instanceof DomainError) throw error;
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "O relatório da pipeline está indisponível ou inválido. A execução permanece ativa.",
+        );
+      }
+      await repository.recordValidationEvidence(collected.evidence, state.fingerprint);
+      return applyCallback(collected.callback);
     },
     async reconcileDispatch(input: DispatchReconciliationInput) {
       const state = await repository.prepareDispatchReconciliation(input);

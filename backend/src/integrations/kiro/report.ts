@@ -115,6 +115,7 @@ export function parseRunReport(
   context: {
     files: Readonly<Record<string, number>>;
     testPaths: readonly string[];
+    classification?: "bug" | "melhoria";
   },
 ): RunReport {
   try {
@@ -162,7 +163,10 @@ export function parseRunReport(
       if (
         report.outcome === "ready" &&
         (expected.phase === "regression" || expected.phase === "fix") &&
-        (report.regressionTestPaths.length === 0 || report.expectedFailure === null)
+        (report.regressionTestPaths.length === 0 ||
+          (context.classification === "melhoria"
+            ? report.expectedFailure !== null
+            : report.expectedFailure === null))
       )
         throw new Error();
     }

@@ -13,6 +13,7 @@ import { createServer } from "./server.js";
 import { createTicketService } from "./services/ticketService.js";
 import { createTriageService } from "./services/triageService.js";
 import { createImplementationService } from "./services/implementationService.js";
+import { createPipelineReportCollector } from "./integrations/ci/collectReport.js";
 
 let server: ReturnType<typeof createServer> | undefined;
 let database: AppDatabase | undefined;
@@ -70,6 +71,14 @@ try {
             createImplementationRepository(database),
             { ready: false, sourceHashes: {} },
             createGithubClient(environment.GH_TOKEN ? { token: environment.GH_TOKEN } : {}),
+            createPipelineReportCollector({
+              applicationRoot: root,
+              secretValues: [
+                environment.GH_TOKEN,
+                environment.KIRO_API_KEY,
+                environment.DATABASE_URL,
+              ].filter((value): value is string => Boolean(value)),
+            }),
           ),
         }
       : {},

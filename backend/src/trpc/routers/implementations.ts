@@ -25,6 +25,10 @@ export const implementationsRouter = router({
     .input(pipelineCallbackSchema)
     .output(implementationCallbackResultSchema)
     .mutation(({ ctx, input }) => ctx.implementations.applyCallback(input)),
+  reconcile: implementationProcedure
+    .input(implementationIdentitySchema)
+    .output(implementationCallbackResultSchema)
+    .mutation(({ ctx, input }) => ctx.implementations.reconcile(input.executionId)),
   list: implementationProcedure
     .input(implementationListInputSchema.optional())
     .output(implementationListSchema)

@@ -1,5 +1,8 @@
 # Callback da pipeline — implementação e evidências
 
+Continuação implementada: [evidência interna e confirmação remota antes de concluir](conclusao-implementacao.md).
+Os resultados abaixo registram a entrega original de validação e idempotência.
+
 ## Objetivo e escopo
 
 Continuar as tarefas 12, 14 e 39 do [plano canônico](../tasks.md), seguindo

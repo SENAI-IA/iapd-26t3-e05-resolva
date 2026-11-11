@@ -93,6 +93,52 @@ function pipelineCallback(
 }
 
 describe("implementação transacional", () => {
+  it("reserva a entrega com identidade estável antes de qualquer disparo", async () => {
+    const ticketId = await eligibleTicket();
+    const input = { ticketId, expectedVersion: 1, requestKey: randomUUID() };
+    const first = await repository.reserve(input, environment);
+    const detail = await repository.byId(first.id);
+    expect(detail.delivery).toMatchObject({
+      id: expect.any(String),
+      number: 1,
+      branchName: `resolva/res-${ticketId}-${first.id.slice(0, 8)}`,
+      prNumber: null,
+      remoteHeadSha: null,
+    });
+    expect(first.reservation).toMatchObject({
+      deliveryId: detail.delivery?.id,
+      branchName: detail.delivery?.branchName,
+    });
+    await repository.reserve(input, environment);
+    const rows = await resource.database.pool.query(
+      "SELECT first_execution_id,repository,base_branch FROM deliveries WHERE ticket_id=$1",
+      [ticketId],
+    );
+    expect(rows.rows).toEqual([
+      { first_execution_id: first.id, repository: "equipe/alvo", base_branch: "main" },
+    ]);
+  });
+
+  it("faz rollback da reserva quando a entrega não pode ser criada", async () => {
+    const ticketId = await eligibleTicket();
+    await resource.database.pool.query(
+      "ALTER TABLE deliveries ADD CONSTRAINT reject_delivery_test CHECK (number < 0)",
+    );
+    try {
+      await expect(
+        repository.reserve({ ticketId, expectedVersion: 1, requestKey: randomUUID() }, environment),
+      ).rejects.toThrow();
+    } finally {
+      await resource.database.pool.query(
+        "ALTER TABLE deliveries DROP CONSTRAINT reject_delivery_test",
+      );
+    }
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("aguardando_implementacao");
+    expect(
+      (await resource.database.pool.query("SELECT id FROM executions WHERE kind='implementation'"))
+        .rowCount,
+    ).toBe(0);
+  });
   it.each([
     [
       "outro repositório",
@@ -231,17 +277,11 @@ describe("implementação transacional", () => {
       await expect(
         repository.applyPipelineCallback(
           pipelineCallback(executionId, {
-            status: "success",
-            branch: "resolva/res-1",
-            commitSha: "a".repeat(40),
-            pullRequest: {
-              number: 12,
-              url: "https://github.com/equipe/alvo/pull/12",
-              state: "OPEN",
-            },
+            status: "failure",
+            failureReason: "Falha fictícia",
           }),
         ),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ cause: { code: "23514" } });
     } finally {
       await resource.database.pool.query(
         "ALTER TABLE execution_events DROP CONSTRAINT callback_test_failure",
@@ -256,7 +296,7 @@ describe("implementação transacional", () => {
     });
     expect((await tickets.byId(ticketId)).ticket.status).toBe("em_andamento");
     const history = await resource.database.pool.query(
-      "SELECT id FROM ticket_events WHERE ticket_id=$1 AND type='implementation_ready_for_review'",
+      "SELECT id FROM ticket_events WHERE ticket_id=$1 AND type='implementation_failed'",
       [ticketId],
     );
     expect(history.rowCount).toBe(0);
@@ -382,7 +422,7 @@ describe("implementação transacional", () => {
       execution: { id: reservation.id, status: "em_andamento", triageId: expect.any(String) },
       ticket: { id: ticketId, status: "em_andamento" },
       triage: { classification: "bug", regressionTestPlan: "Executar a regressão" },
-      delivery: null,
+      delivery: { id: expect.any(String), number: 1, prNumber: null },
     });
     expect(JSON.stringify(detail)).not.toContain("ticket_snapshot");
   });
@@ -398,6 +438,32 @@ describe("implementação transacional", () => {
     const replay = await repository.reserve(input, environment);
     expect(replay).toMatchObject({ id: first.id, reservation: null });
     expect((await resource.database.pool.query("SELECT id FROM executions")).rowCount).toBe(2);
+  });
+
+  it("reproduz reservas concorrentes da mesma intenção sem criar entrega órfã", async () => {
+    const ticketId = await eligibleTicket();
+    const input = { ticketId, expectedVersion: 1, requestKey: randomUUID() };
+    const [first, second] = await Promise.all([
+      repository.reserve(input, environment),
+      repository.reserve(input, environment),
+    ]);
+    expect(second.id).toBe(first.id);
+    expect([first.reservation, second.reservation].filter(Boolean)).toHaveLength(1);
+    expect(
+      (
+        await resource.database.pool.query("SELECT id FROM deliveries WHERE ticket_id=$1", [
+          ticketId,
+        ])
+      ).rowCount,
+    ).toBe(1);
+    expect(
+      (
+        await resource.database.pool.query(
+          "SELECT id FROM executions WHERE kind='implementation' AND ticket_id=$1",
+          [ticketId],
+        )
+      ).rowCount,
+    ).toBe(1);
   });
 
   it("recusa outra implementação enquanto há execução ativa", async () => {
@@ -440,6 +506,7 @@ describe("implementação transacional", () => {
     const result = await service.start(input);
 
     expect(result.implementationExecutionId).toBeTypeOf("string");
+    const detail = await repository.byId(result.implementationExecutionId);
     expect(execute).toHaveBeenNthCalledWith(
       3,
       [
@@ -456,6 +523,10 @@ describe("implementação transacional", () => {
         `ticketId=${ticketId}`,
         "--field",
         "ticketVersion=1",
+        "--field",
+        `deliveryId=${detail.delivery?.id}`,
+        "--field",
+        `branchName=${detail.delivery?.branchName}`,
       ],
       expect.anything(),
     );
@@ -497,53 +568,23 @@ describe("implementação transacional", () => {
     });
   });
 
-  it("aplica callback de sucesso uma única vez e aguarda revisão humana", async () => {
-    const ticketId = await eligibleTicket();
-    const reservation = await repository.reserve(
-      startImplementationSchema.parse({
-        ticketId,
-        expectedVersion: 1,
-        requestKey: randomUUID(),
-      }),
-      environment,
-    );
-    const callback = {
-      schemaVersion: 1 as const,
-      executionId: reservation.id,
-      repository: "equipe/alvo",
-      workflowId: "987654",
-      workflowUrl: "https://github.com/equipe/alvo/actions/runs/987654",
-      status: "success" as const,
-      branch: "resolva/res-1-abc",
-      commitSha: "a".repeat(40),
-      pullRequest: {
-        number: 12,
-        url: "https://github.com/equipe/alvo/pull/12",
-        state: "OPEN" as const,
-      },
-      failureReason: null,
-    };
-
-    await expect(repository.applyPipelineCallback(callback)).resolves.toMatchObject({
-      applied: true,
-    });
-    await expect(repository.applyPipelineCallback(callback)).resolves.toMatchObject({
-      applied: false,
-    });
-    expect((await tickets.byId(ticketId)).ticket.status).toBe("aguardando_revisao");
-    const execution = await resource.database.pool.query(
-      "SELECT status,outcome,published_sha FROM executions WHERE id=$1",
-      [reservation.id],
-    );
-    expect(execution.rows[0]).toEqual({
-      status: "concluida",
-      outcome: "pipeline_succeeded",
-      published_sha: "a".repeat(40),
-    });
-    const events = await resource.database.pool.query(
-      "SELECT type FROM execution_events WHERE execution_id=$1 AND type='pipeline_callback'",
-      [reservation.id],
-    );
-    expect(events.rowCount).toBe(1);
+  it("não aprova retrospectivamente uma execução legada sem entrega", async () => {
+    const { executionId, ticketId } = await reserveImplementation();
+    await resource.database.pool.query("UPDATE executions SET delivery_id=NULL WHERE id=$1", [
+      executionId,
+    ]);
+    const service = createImplementationService(repository, environment);
+    await expect(
+      service.applyCallback(
+        pipelineCallback(executionId, {
+          status: "success",
+          branch: "resolva/res-1-abc",
+          commitSha: "a".repeat(40),
+          pullRequest: { number: 12, url: "https://github.com/equipe/alvo/pull/12", state: "OPEN" },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect((await tickets.byId(ticketId)).ticket.status).toBe("em_andamento");
+    expect((await repository.byId(executionId)).execution.status).toBe("em_andamento");
   });
 });

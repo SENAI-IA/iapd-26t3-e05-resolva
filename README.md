@@ -105,19 +105,29 @@ O adaptador de triagem prepara um workspace descartável, gera o perfil Kiro V3 
 ## Callback de implementação
 
 O backend também expõe `implementations.queue`, `start`, `list`, `byId` e
-`callback`. O início padrão continua bloqueado até a integração do ambiente.
+`callback` e `reconcile`. O início padrão continua bloqueado até a integração do ambiente.
 Callbacks são validados contra o snapshot da execução, vinculam um único workflow
 e ignoram mensagens já aplicadas, inclusive após a conclusão. A migração
 `0002_identidade_workflow.sql` preserva a identidade de workflows existentes.
-Confirmação remota de SHA, testes e PR e reconciliação ainda estão pendentes.
+Sucesso informado pelo callback mantém a execução ativa até haver evidência
+aprovada pelo executor interno e confirmação remota da workflow, PR e SHA.
 [Detalhes e evidências do callback](.kiro/specs/resolva-mvp/docs/callback-pipeline.md).
 
 O cliente GitHub também oferece consultas de workflow, PR e ponta da branch e
 `confirmDelivery`, que confere uma PR contra repositório, branches, marcador da
-entrega e SHA previamente validado. O adaptador só consulta o GitHub e ainda não
-está conectado ao callback ou às transições da API. Persistência das evidências de
-teste e coordenação da reconciliação permanecem pendentes.
+entrega e SHA previamente validado. A confirmação está conectada ao callback:
+entrega, PR, execução e histórico são atualizados na mesma transação após as
+consultas remotas. O backend reserva a entrega antes do disparo e registra o SHA,
+o resumo aprovado dos testes e os metadados do relatório. A aprovação é interna,
+sem procedure pública. A coleta real do relatório da pipeline permanece pendente.
 [Escopo e evidências da confirmação](.kiro/specs/resolva-mvp/docs/confirmacao-github.md).
+
+`implementations.reconcile({ executionId })` retoma manualmente uma proposta de
+sucesso persistida depois de indisponibilidade do GitHub ou resposta perdida.
+A operação só consulta e confirma; não dispara workflow nem publica outra PR.
+Sem proposta ou evidência suficiente, retorna uma precondição explícita e mantém
+a exclusividade da execução. Repetições após a conclusão são inócuas, mesmo sem
+GitHub disponível. [Contratos e evidências da conclusão](.kiro/specs/resolva-mvp/docs/conclusao-implementacao.md).
 
 ## Configuração do projeto-alvo
 

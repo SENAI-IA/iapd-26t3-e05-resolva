@@ -1,5 +1,8 @@
 # Confirmação remota no GitHub — plano e evidências
 
+Continuação implementada: [persistência, callback e reconciliação pela API](conclusao-implementacao.md).
+O escopo e os resultados abaixo registram a entrega original do adaptador.
+
 ## Escopo
 
 Continuar os adaptadores das tarefas 18, 29 e 40 do [plano](../tasks.md),

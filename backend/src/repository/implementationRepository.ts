@@ -1,4 +1,6 @@
 import { and, count, desc, eq, ilike, max, or, sql, type SQL } from "drizzle-orm";
+import { z } from "zod";
+import { githubRepositorySchema, githubBranchSchema } from "../integrations/github/contracts.js";
 import type { AppDatabase } from "../db/index.js";
 import {
   executionEvents,
@@ -8,12 +10,7 @@ import {
   tickets,
   triages,
 } from "../db/schema.js";
-import {
-  parsePipelineCallback,
-  pipelineCallbackFingerprint,
-  pipelineCallbackSchema,
-  type PipelineCallback,
-} from "../integrations/ci/callback.js";
+import type { PipelineCallback } from "../integrations/ci/callback.js";
 import {
   sourceHashesSchema,
   type ImplementationEnvironment,
@@ -34,12 +31,24 @@ import { DomainError } from "../domain/error.js";
 import { canStartImplementation } from "../domain/triage.js";
 import { transitionTicket } from "../domain/ticket.js";
 import { toTicket } from "./ticketRepository.js";
+import { createImplementationEvidenceRepository } from "./implementationEvidenceRepository.js";
+import { nextExecutionSequence } from "./implementationTransactions.js";
+import { lockPipelineCallback } from "./implementationCallback.js";
+import {
+  createImplementationCompletionRepository,
+  confirmPipelineDelivery,
+  type PipelineSuccessProof,
+} from "./implementationCompletionRepository.js";
 
 type Transaction = Parameters<Parameters<AppDatabase["db"]["transaction"]>[0]>[0];
 type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes">;
 
 type TriageRow = typeof triages.$inferSelect;
 type TicketRow = typeof tickets.$inferSelect;
+const deliveryConfigSchema = z.object({
+  repository: githubRepositorySchema,
+  baseBranch: githubBranchSchema,
+});
 
 function toImplementationTicket(ticket: Ticket): ImplementationTicket {
   return {
@@ -102,6 +111,8 @@ function executionDetails(execution: typeof executions.$inferSelect) {
     ticketId: execution.ticketId,
     ticketVersion: execution.ticketVersion,
     triageId: execution.triageId,
+    deliveryId: execution.deliveryId,
+    validatedSha: execution.validatedSha,
     status: execution.status,
     stage: execution.stage,
     mode: execution.mode,
@@ -119,14 +130,6 @@ function listFilter(input: ImplementationListInput) {
   if (input.ticketId) conditions.push(eq(executions.ticketId, input.ticketId));
   if (input.status) conditions.push(eq(executions.status, input.status));
   return and(...conditions);
-}
-
-async function nextExecutionSequence(tx: Transaction, executionId: string) {
-  const [event] = await tx
-    .select({ value: max(executionEvents.sequence) })
-    .from(executionEvents)
-    .where(eq(executionEvents.executionId, executionId));
-  return Number(event?.value ?? 0) + 1;
 }
 
 async function activeExecutionId(connection: AppDatabase["db"] | Transaction) {
@@ -165,6 +168,8 @@ function assertEligibility(
 
 export function createImplementationRepository(database: AppDatabase) {
   return {
+    ...createImplementationEvidenceRepository(database),
+    ...createImplementationCompletionRepository(database),
     async queue(
       input: ImplementationQueueInput,
       environment: RuntimeEnvironment,
@@ -343,62 +348,12 @@ export function createImplementationRepository(database: AppDatabase) {
       });
     },
 
-    async applyPipelineCallback(input: PipelineCallback) {
+    async applyPipelineCallback(input: PipelineCallback, proof?: PipelineSuccessProof) {
       return database.db.transaction(async (tx) => {
-        const [row] = await tx
-          .select({ execution: executions, ticket: tickets })
-          .from(executions)
-          .innerJoin(tickets, eq(tickets.id, executions.ticketId))
-          .where(and(eq(executions.id, input.executionId), eq(executions.kind, "implementation")))
-          .for("update");
-        if (!row) throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
-        if (row.execution.blockerCode === "WORKFLOW_IDENTITY_CONFLICT")
-          throw new DomainError(
-            "PRECONDITION_FAILED",
-            "O histórico contém workflows divergentes. Reconcilie a execução antes de receber novos callbacks.",
-          );
-        const repository = pipelineCallbackSchema.shape.repository.safeParse(
-          row.execution.configSnapshot.repository,
-        );
-        if (!repository.success)
-          throw new DomainError(
-            "PRECONDITION_FAILED",
-            "A configuração da execução não identifica um repositório válido.",
-          );
-        let callback: PipelineCallback;
-        try {
-          callback = parsePipelineCallback(input, {
-            executionId: row.execution.id,
-            repository: repository.data,
-          });
-        } catch {
-          throw new DomainError("BAD_REQUEST", "Callback da pipeline inválido.");
-        }
-        if (
-          (row.execution.workflowId !== null && row.execution.workflowId !== callback.workflowId) ||
-          (row.execution.workflowUrl !== null && row.execution.workflowUrl !== callback.workflowUrl)
-        )
-          throw new DomainError("CONFLICT", "O callback pertence a outro workflow.");
-        const fingerprint = pipelineCallbackFingerprint(callback);
-        const [replay] = await tx
-          .select({ payload: executionEvents.payload })
-          .from(executionEvents)
-          .where(
-            and(
-              eq(executionEvents.executionId, callback.executionId),
-              eq(executionEvents.type, "pipeline_callback"),
-              sql`${executionEvents.payload}->>'fingerprint' = ${fingerprint}`,
-            ),
-          )
-          .limit(1);
+        const { row, callback, fingerprint, replay } = await lockPipelineCallback(tx, input);
         if (replay) return { applied: false, fingerprint };
-        if (row.execution.status !== "em_andamento")
-          throw new DomainError(
-            "CONFLICT",
-            "A execução já foi finalizada e recebeu outro callback.",
-          );
-        if (row.execution.outcome === "pipeline_running" && callback.status === "queued")
-          throw new DomainError("CONFLICT", "O callback não pode regredir o estado da pipeline.");
+        if (callback.status === "success")
+          await confirmPipelineDelivery(tx, row, callback, fingerprint, proof);
 
         const sequence = await nextExecutionSequence(tx, callback.executionId);
         const payload = {
@@ -500,6 +455,18 @@ export function createImplementationRepository(database: AppDatabase) {
           .where(eq(tickets.id, input.ticketId))
           .for("update");
         if (!ticket) throw new DomainError("NOT_FOUND", "Ticket não encontrado.");
+        const [reservedWhileWaiting] = await tx
+          .select({ id: executions.id, kind: executions.kind, ticketId: executions.ticketId })
+          .from(executions)
+          .where(eq(executions.requestKey, input.requestKey));
+        if (reservedWhileWaiting) {
+          if (
+            reservedWhileWaiting.ticketId !== input.ticketId ||
+            reservedWhileWaiting.kind !== "implementation"
+          )
+            throw new DomainError("CONFLICT", "A chave já pertence a outra intenção de execução.");
+          return { id: reservedWhileWaiting.id, reservation: null };
+        }
         if (ticket.version !== input.expectedVersion)
           throw new DomainError(
             "CONFLICT",
@@ -509,6 +476,12 @@ export function createImplementationRepository(database: AppDatabase) {
         const triage = await findTriage(tx, ticket);
         const activeId = await activeExecutionId(tx);
         assertEligibility(ticket, triage, environment, activeId);
+        const config = deliveryConfigSchema.safeParse(ticket.targetConfigSnapshot);
+        if (!config.success)
+          throw new DomainError(
+            "PRECONDITION_FAILED",
+            "A configuração não identifica o repositório e a branch da entrega.",
+          );
         const nextStatus = transitionTicket(ticket.status, {
           type: "start_implementation",
           ticket: toImplementationTicket(toTicket(ticket, triage)),
@@ -575,6 +548,28 @@ export function createImplementationRepository(database: AppDatabase) {
           );
         }
 
+        const [lastDelivery] = await tx
+          .select({ number: max(deliveries.number) })
+          .from(deliveries)
+          .where(eq(deliveries.ticketId, ticket.id));
+        const branchName = `resolva/res-${ticket.id}-${created.id.slice(0, 8)}`;
+        const [delivery] = await tx
+          .insert(deliveries)
+          .values({
+            ticketId: ticket.id,
+            number: (lastDelivery?.number ?? 0) + 1,
+            firstExecutionId: created.id,
+            repository: config.data.repository,
+            baseBranch: config.data.baseBranch,
+            branchName,
+          })
+          .returning({ id: deliveries.id });
+        if (!delivery) throw new Error("A entrega não pôde ser reservada.");
+        await tx
+          .update(executions)
+          .set({ deliveryId: delivery.id })
+          .where(eq(executions.id, created.id));
+
         await tx
           .update(tickets)
           .set({ status: nextStatus, updatedAt: sql`clock_timestamp()` })
@@ -603,6 +598,8 @@ export function createImplementationRepository(database: AppDatabase) {
           id: created.id,
           reservation: {
             executionId: created.id,
+            deliveryId: delivery.id,
+            branchName,
             ticketId: ticket.id,
             triageId: triage?.id ?? null,
             ticketSnapshot,

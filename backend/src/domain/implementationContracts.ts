@@ -57,6 +57,8 @@ export const implementationExecutionSchema = z.strictObject({
   ticketId: z.number().int().positive(),
   ticketVersion: z.number().int().positive(),
   triageId: z.uuid().nullable(),
+  deliveryId: z.uuid().nullable(),
+  validatedSha: z.string().nullable(),
   status: executionStatusSchema,
   stage: z.string().nullable(),
   mode: executionModeSchema.nullable(),

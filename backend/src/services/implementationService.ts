@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { GithubCliError, type GithubClient } from "../integrations/github/cli.js";
+import { DeliveryConfirmationError } from "../integrations/github/confirmation.js";
 import type { PipelineCallback } from "../integrations/ci/callback.js";
 import { DomainError } from "../domain/error.js";
 import type { ImplementationEnvironment } from "../domain/contracts.js";
@@ -23,6 +24,52 @@ export function createImplementationService(
   environment: Pick<ImplementationEnvironment, "ready" | "sourceHashes">,
   github?: GithubClient,
 ) {
+  async function applyCallback(callback: PipelineCallback) {
+    if (callback.status !== "success") return repository.applyPipelineCallback(callback);
+    const proposal = await repository.registerSuccessProposal(callback);
+    if (proposal.replay) return proposal.result;
+    const context = await repository.prepareSuccessConfirmation(callback);
+    if (context.replay) return context.result;
+    if (!github)
+      throw new DomainError(
+        "PRECONDITION_FAILED",
+        "Configure o GitHub para confirmar a entrega da implementação.",
+      );
+    let delivery;
+    try {
+      const workflow = await github.getWorkflowRun({
+        repository: context.expected.repository,
+        workflowId: callback.workflowId,
+      });
+      if (
+        workflow.status !== "completed" ||
+        workflow.conclusion !== "success" ||
+        workflow.event !== "workflow_dispatch" ||
+        workflow.attempt !== context.workflowAttempt ||
+        workflow.workflowDefinitionId !== context.workflowDefinitionId ||
+        workflow.headBranch !== context.expected.baseBranch
+      )
+        throw new DomainError("CONFLICT", "A workflow remota diverge da evidência aprovada.");
+      delivery = await github.confirmDelivery(context.expected);
+    } catch (error) {
+      if (error instanceof DomainError) throw error;
+      if (error instanceof DeliveryConfirmationError)
+        throw new DomainError("CONFLICT", error.message);
+      throw new DomainError(
+        "PRECONDITION_FAILED",
+        "Não foi possível confirmar a execução no GitHub. A implementação permanece ativa para reconciliação.",
+      );
+    }
+    return repository.applyPipelineCallback(callback, {
+      callbackFingerprint: context.callbackFingerprint,
+      validationFingerprint: context.validationFingerprint,
+      workflowId: callback.workflowId,
+      workflowDefinitionId: context.workflowDefinitionId,
+      workflowAttempt: context.workflowAttempt,
+      delivery,
+    });
+  }
+
   async function assertGithubAvailability() {
     if (!github) return;
     try {
@@ -62,6 +109,8 @@ export function createImplementationService(
           executionId: reservation.executionId,
           ticketId: String(reservation.ticketId),
           ticketVersion: String(reservation.ticketSnapshot.version),
+          deliveryId: reservation.deliveryId,
+          branchName: reservation.branchName,
         },
       });
       await repository.markWorkflowDispatched(reservation.executionId);
@@ -84,8 +133,9 @@ export function createImplementationService(
     byId(executionId: string) {
       return repository.byId(executionId);
     },
-    applyCallback(callback: PipelineCallback) {
-      return repository.applyPipelineCallback(callback);
+    applyCallback,
+    async reconcile(executionId: string) {
+      return applyCallback(await repository.pendingSuccessCallback(executionId));
     },
     async start(input: StartImplementationInput) {
       const { id, reservation } = await repository.reserve(input, environment);

@@ -5,10 +5,12 @@ import type {
   TicketDetails,
   TicketEvents,
 } from "../../backend/src/domain/contracts.js";
+import type { ImplementationQueueResult } from "../../backend/src/domain/implementationContracts.js";
 import {
   createTicket,
   getTicket,
   getTicketEvents,
+  listImplementationQueue,
   listTickets,
   startImplementation,
   startTriage,
@@ -38,6 +40,7 @@ const emptyForm: TicketContent = {
 
 function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
@@ -51,8 +54,12 @@ function App() {
   async function refreshTickets(selectedId?: number) {
     setLoading(true);
     try {
-      const result = await listTickets();
+      const [result, implementationQueue] = await Promise.all([
+        listTickets(),
+        listImplementationQueue(),
+      ]);
       setTickets(result.items);
+      setQueue(implementationQueue.items);
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
         const [detail, history] = await Promise.all([getTicket(nextId), getTicketEvents(nextId)]);
@@ -208,6 +215,31 @@ function App() {
                 <p className="mt-2 text-xs text-muted">{statusLabels[ticket.status]}</p>
               </button>
             ))}
+          </div>
+          <div className="mt-8 border-t border-line pt-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="font-semibold">Fila de implementação</h3>
+              <span className="text-xs text-muted">{queue.length}</span>
+            </div>
+            {queue.length === 0 ? (
+              <p className="mt-3 text-sm text-muted">Nenhum ticket elegível.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {queue.map(({ ticket, eligibility }) => (
+                  <button
+                    className="w-full rounded-lg border border-line p-3 text-left text-sm hover:border-ink"
+                    key={ticket.id}
+                    onClick={() => void selectTicket(ticket.id)}
+                    type="button"
+                  >
+                    <span className="font-semibold">{ticket.code}</span>
+                    <span className="mt-1 block text-muted">
+                      {eligibility.eligible ? "Pronto para iniciar" : eligibility.message}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

@@ -7,12 +7,14 @@ import type {
 } from "../../backend/src/domain/contracts.js";
 import type {
   ImplementationQueueResult,
+  ImplementationDetail,
   PublicEnvironment,
 } from "../../backend/src/domain/implementationContracts.js";
 import type { TriageDetail } from "../../backend/src/domain/triageContracts.js";
 import {
   createTicket,
   contestTriage,
+  getImplementation,
   getImplementationEnvironment,
   getTicket,
   getTicketEvents,
@@ -20,6 +22,7 @@ import {
   listImplementationQueue,
   listTickets,
   provideTicketInformation,
+  reconcileDispatch,
   reopenTicket,
   resolveTicket,
   startImplementation,
@@ -54,6 +57,7 @@ function App() {
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [triage, setTriage] = useState<TriageDetail | null>(null);
+  const [implementation, setImplementation] = useState<ImplementationDetail | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -82,18 +86,23 @@ function App() {
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
         const detail = await getTicket(nextId);
-        const [history, currentTriage] = await Promise.all([
+        const [history, currentTriage, currentImplementation] = await Promise.all([
           getTicketEvents(nextId),
           detail.ticket.currentTriageId
             ? getTriage(detail.ticket.currentTriageId)
+            : Promise.resolve(null),
+          detail.latestExecution?.kind === "implementation"
+            ? getImplementation(detail.latestExecution.id)
             : Promise.resolve(null),
         ]);
         setSelected(detail);
         setEvents(history.items);
         setTriage(currentTriage);
+        setImplementation(currentImplementation);
       } else {
         setSelected(null);
         setTriage(null);
+        setImplementation(null);
         setEvents([]);
       }
       setError(null);
@@ -112,15 +121,19 @@ function App() {
     setAction(null);
     try {
       const detail = await getTicket(ticketId);
-      const [history, currentTriage] = await Promise.all([
+      const [history, currentTriage, currentImplementation] = await Promise.all([
         getTicketEvents(ticketId),
         detail.ticket.currentTriageId
           ? getTriage(detail.ticket.currentTriageId)
+          : Promise.resolve(null),
+        detail.latestExecution?.kind === "implementation"
+          ? getImplementation(detail.latestExecution.id)
           : Promise.resolve(null),
       ]);
       setSelected(detail);
       setEvents(history.items);
       setTriage(currentTriage);
+      setImplementation(currentImplementation);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o ticket.");
@@ -182,6 +195,24 @@ function App() {
       setError(
         cause instanceof Error ? cause.message : "Não foi possível iniciar a implementação.",
       );
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function reconcileImplementation() {
+    if (!implementation?.execution.workflowId) return;
+    setAction("reconcile");
+    setError(null);
+    try {
+      const result = await reconcileDispatch({
+        executionId: implementation.execution.id,
+        workflowId: implementation.execution.workflowId,
+      });
+      setNotice(`Workflow consultada: ${result.observedStatus}.`);
+      if (selected) await refreshTickets(selected.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível reconciliar a workflow.");
     } finally {
       setAction(null);
     }
@@ -487,6 +518,16 @@ function App() {
                     PR #{selected.currentDelivery.prNumber ?? "pendente"}
                   </span>
                 ) : null}
+                {implementation?.execution.workflowUrl ? (
+                  <a
+                    className="rounded-full bg-canvas px-3 py-1 underline underline-offset-4"
+                    href={implementation.execution.workflowUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Workflow da implementação
+                  </a>
+                ) : null}
               </div>
               <div className="mt-8 grid gap-6 md:grid-cols-2">
                 <div>
@@ -672,6 +713,16 @@ function App() {
                     type="button"
                   >
                     {action === "implementation" ? "Solicitando..." : "Iniciar implementação"}
+                  </button>
+                ) : null}
+                {implementation?.execution.workflowId ? (
+                  <button
+                    className="rounded-lg border border-line px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    disabled={action !== null}
+                    onClick={() => void reconcileImplementation()}
+                    type="button"
+                  >
+                    {action === "reconcile" ? "Consultando..." : "Atualizar execução"}
                   </button>
                 ) : null}
                 {selected.currentDelivery?.prUrl ? (

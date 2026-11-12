@@ -7,9 +7,11 @@ import type {
 } from "../../backend/src/domain/contracts.js";
 import type {
   ImplementationQueueResult,
+  ImplementationDetail,
   PublicEnvironment,
   StartImplementationResult,
 } from "../../backend/src/domain/implementationContracts.js";
+import type { DispatchReconciliationResult } from "../../backend/src/domain/implementationDispatch.js";
 import type { StartTriageInput, TriageDetail } from "../../backend/src/domain/triageContracts.js";
 
 type ApiResponse<T> = {
@@ -90,6 +92,17 @@ export function reopenTicket(input: {
 
 export function startTriage(input: StartTriageInput): Promise<StartTriageResult> {
   return call<StartTriageResult>("triages.start", input, true);
+}
+
+export function getImplementation(executionId: string): Promise<ImplementationDetail> {
+  return call<ImplementationDetail>("implementations.byId", { executionId });
+}
+
+export function reconcileDispatch(input: {
+  executionId: string;
+  workflowId: string;
+}): Promise<DispatchReconciliationResult> {
+  return call<DispatchReconciliationResult>("implementations.reconcileDispatch", input, true);
 }
 
 export function getImplementationEnvironment(): Promise<PublicEnvironment> {

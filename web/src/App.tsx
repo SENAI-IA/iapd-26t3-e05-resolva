@@ -137,6 +137,14 @@ function App() {
     void refreshTickets();
   }, []);
 
+  useEffect(() => {
+    if (!executions.some(({ execution }) => execution.status === "em_andamento")) return;
+    const timer = window.setInterval(() => {
+      void refreshTickets(selected?.ticket.id);
+    }, 10_000);
+    return () => window.clearInterval(timer);
+  }, [executions, page, search, selected?.ticket.id, statusFilter]);
+
   async function selectTicket(ticketId: number) {
     setAction(null);
     try {
@@ -493,7 +501,12 @@ function App() {
             )}
           </div>
           <div className="mt-8 border-t border-line pt-5">
-            <h3 className="font-semibold">Execuções recentes ({executions.length})</h3>
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="font-semibold">Execuções recentes ({executions.length})</h3>
+              {executions.some(({ execution }) => execution.status === "em_andamento") ? (
+                <span className="text-xs text-muted">Atualização automática</span>
+              ) : null}
+            </div>
             {executions.length === 0 ? (
               <p className="mt-3 text-sm text-muted">Nenhuma execução registrada.</p>
             ) : (

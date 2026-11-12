@@ -9,13 +9,17 @@ import type {
   ImplementationQueueResult,
   PublicEnvironment,
 } from "../../backend/src/domain/implementationContracts.js";
+import type { TriageDetail } from "../../backend/src/domain/triageContracts.js";
 import {
   createTicket,
+  contestTriage,
   getImplementationEnvironment,
   getTicket,
   getTicketEvents,
+  getTriage,
   listImplementationQueue,
   listTickets,
+  provideTicketInformation,
   startImplementation,
   startTriage,
 } from "./api";
@@ -47,11 +51,14 @@ function App() {
   const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
+  const [triage, setTriage] = useState<TriageDetail | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageSaving, setMessageSaving] = useState(false);
   const [action, setAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -69,11 +76,19 @@ function App() {
       setEnvironment(implementationEnvironment);
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
-        const [detail, history] = await Promise.all([getTicket(nextId), getTicketEvents(nextId)]);
+        const detail = await getTicket(nextId);
+        const [history, currentTriage] = await Promise.all([
+          getTicketEvents(nextId),
+          detail.ticket.currentTriageId
+            ? getTriage(detail.ticket.currentTriageId)
+            : Promise.resolve(null),
+        ]);
         setSelected(detail);
         setEvents(history.items);
+        setTriage(currentTriage);
       } else {
         setSelected(null);
+        setTriage(null);
         setEvents([]);
       }
       setError(null);
@@ -91,9 +106,16 @@ function App() {
   async function selectTicket(ticketId: number) {
     setAction(null);
     try {
-      const [detail, history] = await Promise.all([getTicket(ticketId), getTicketEvents(ticketId)]);
+      const detail = await getTicket(ticketId);
+      const [history, currentTriage] = await Promise.all([
+        getTicketEvents(ticketId),
+        detail.ticket.currentTriageId
+          ? getTriage(detail.ticket.currentTriageId)
+          : Promise.resolve(null),
+      ]);
       setSelected(detail);
       setEvents(history.items);
+      setTriage(currentTriage);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o ticket.");
@@ -160,6 +182,35 @@ function App() {
     }
   }
 
+  async function submitTicketMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || !message.trim()) return;
+    setMessageSaving(true);
+    setError(null);
+    try {
+      const input = {
+        ticketId: selected.ticket.id,
+        expectedVersion: selected.ticket.version,
+        message: message.trim(),
+      };
+      if (selected.ticket.status === "aguardando_informacoes") {
+        await provideTicketInformation(input);
+        setNotice("Informação registrada. O ticket voltou para análise.");
+      } else if (selected.ticket.status === "recusado") {
+        await contestTriage(input);
+        setNotice("Contestação registrada.");
+      }
+      setMessage("");
+      await refreshTickets(selected.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível registrar a mensagem.");
+    } finally {
+      setMessageSaving(false);
+    }
+  }
+
+  const canProvideInformation = selected?.ticket.status === "aguardando_informacoes";
+  const canContest = selected?.ticket.status === "recusado" && triage !== null;
   const canAnalyze =
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
   const canImplement = selected?.ticket.status === "aguardando_implementacao";
@@ -405,6 +456,73 @@ function App() {
                     {selected.ticket.reproductionSteps}
                   </p>
                 </div>
+              ) : null}
+              {triage ? (
+                <section className="mt-8 rounded-lg bg-canvas p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="font-semibold">Resultado da triagem</h3>
+                    <span className="rounded-full bg-surface px-3 py-1 text-sm font-semibold">
+                      {triage.classification}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <div>
+                      <h4 className="text-sm font-semibold">Resumo</h4>
+                      <p className="mt-1 text-sm leading-6 text-muted">{triage.summary}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">Diagnóstico</h4>
+                      <p className="mt-1 text-sm leading-6 text-muted">{triage.diagnosis}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">Comportamento observado</h4>
+                      <p className="mt-1 text-sm leading-6 text-muted">{triage.observedBehavior}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">Próxima ação</h4>
+                      <p className="mt-1 text-sm leading-6 text-muted">{triage.nextAction}</p>
+                    </div>
+                  </div>
+                  {triage.questions.length > 0 ? (
+                    <div className="mt-5">
+                      <h4 className="text-sm font-semibold">Informações necessárias</h4>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
+                        {triage.questions.map((question) => (
+                          <li key={question}>{question}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+              {canProvideInformation || canContest ? (
+                <form
+                  className="mt-6 rounded-lg border border-line p-5"
+                  onSubmit={(event) => void submitTicketMessage(event)}
+                >
+                  <h3 className="text-sm font-semibold">
+                    {canProvideInformation ? "Adicionar informação" : "Contestar triagem"}
+                  </h3>
+                  <textarea
+                    className="field min-h-24"
+                    minLength={1}
+                    required
+                    onChange={(event) => setMessage(event.target.value)}
+                    placeholder={
+                      canProvideInformation
+                        ? "Informe o dado que faltou para a triagem."
+                        : "Explique por que a triagem deve ser revisada."
+                    }
+                    value={message}
+                  />
+                  <button
+                    className="mt-4 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    disabled={messageSaving}
+                    type="submit"
+                  >
+                    {messageSaving ? "Enviando..." : "Registrar mensagem"}
+                  </button>
+                </form>
               ) : null}
               <div className="mt-8 border-t border-line pt-5">
                 <h3 className="text-sm font-semibold">Histórico</h3>

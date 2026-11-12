@@ -10,7 +10,7 @@ import type {
   PublicEnvironment,
   StartImplementationResult,
 } from "../../backend/src/domain/implementationContracts.js";
-import type { StartTriageInput } from "../../backend/src/domain/triageContracts.js";
+import type { StartTriageInput, TriageDetail } from "../../backend/src/domain/triageContracts.js";
 
 type ApiResponse<T> = {
   result?: { data?: T };
@@ -46,8 +46,28 @@ export function getTicketEvents(ticketId: number): Promise<TicketEvents> {
   return call<TicketEvents>("tickets.events", { ticketId, page: 1, pageSize: 50 });
 }
 
+export function getTriage(triageId: string): Promise<TriageDetail> {
+  return call<TriageDetail>("triages.byId", { triageId });
+}
+
 export function createTicket(input: TicketContent): Promise<Ticket> {
   return call<Ticket>("tickets.create", input, true);
+}
+
+export function provideTicketInformation(input: {
+  ticketId: number;
+  expectedVersion: number;
+  message: string;
+}): Promise<Ticket> {
+  return call<Ticket>("tickets.provideInformation", input, true);
+}
+
+export function contestTriage(input: {
+  ticketId: number;
+  expectedVersion: number;
+  message: string;
+}): Promise<Ticket> {
+  return call<Ticket>("tickets.contestTriage", input, true);
 }
 
 export function startTriage(input: StartTriageInput): Promise<StartTriageResult> {

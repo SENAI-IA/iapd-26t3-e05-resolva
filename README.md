@@ -12,7 +12,7 @@ O público inicial são equipes de engenharia que precisam acelerar correções 
 
 ## Estado do projeto
 
-**Tickets, triagens e reservas de implementação persistidos no PostgreSQL e consultáveis por API.** O backend mantém histórico e controle de versão dos tickets, com ações de complementação, contestação, resolução e reabertura. A fila e o início manual de implementação estão implementados no backend, com callbacks validados e idempotentes. A execução real depende da integração do ambiente, Kiro e GitHub; o início padrão permanece bloqueado. Interface e reconciliação remota permanecem pendentes.
+**Tickets, triagens e reservas de implementação persistidos no PostgreSQL e consultáveis por API.** O backend mantém histórico e controle de versão dos tickets, com ações de complementação, contestação, resolução e reabertura. A fila e o início manual de implementação estão implementados, com callbacks validados e idempotentes. A interface do MVP-1 já permite cadastrar, listar e consultar tickets, solicitar triagem e iniciar implementação. A execução real depende da integração do ambiente, Kiro e GitHub; o início padrão permanece bloqueado. Acompanhamento avançado e reconciliação remota permanecem pendentes.
 
 ## Fluxo previsto
 

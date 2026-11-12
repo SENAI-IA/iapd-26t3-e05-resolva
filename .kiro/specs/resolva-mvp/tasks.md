@@ -8,7 +8,9 @@ As regras de domínio de triagem e elegibilidade (tarefa 32) estão implementada
 evidências em [docs/triagem-dominio.md](docs/triagem-dominio.md). A reserva e a
 conclusão de triagem são transacionais e as consultas estão disponíveis por tRPC.
 O adaptador de triagem Kiro está exercitado com processo simulado. A execução real
-pelo Kiro CLI headless e a interface permanecem pendentes.
+pelo Kiro CLI headless permanece pendente. A primeira fatia da interface do MVP-1
+agora permite cadastrar, listar e consultar tickets, solicitar triagem e iniciar
+implementação; o acompanhamento avançado e a execução real continuam pendentes.
 
 A fila, a reserva manual e as consultas de implementação estão disponíveis no
 backend, com disparo pelo cliente `gh` em testes. O callback agora valida o
@@ -17,7 +19,7 @@ transacional. A reserva agora cria a entrega antes do disparo; o sucesso exige
 evidência aprovada internamente e confirmação remota de workflow, PR e SHA. A
 reconciliação manual de propostas persistidas está disponível por tRPC. O ambiente
 padrão mantém novos inícios bloqueados; coleta real das evidências, retomada
-automática na inicialização e interface permanecem pendentes. O disparo já grava
+automática na inicialização e acompanhamento avançado da interface permanecem pendentes. O disparo já grava
 checkpoint e conserva exclusividade após resposta perdida; o vínculo manual
 autenticado do run está disponível por `implementations.reconcileDispatch`.
 [Escopo e evidências do callback](docs/callback-pipeline.md).

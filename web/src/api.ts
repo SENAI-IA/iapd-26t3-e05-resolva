@@ -1,0 +1,54 @@
+import type {
+  Ticket,
+  TicketContent,
+  TicketDetails,
+  TicketList,
+} from "../../backend/src/domain/contracts.js";
+import type { StartImplementationResult } from "../../backend/src/domain/implementationContracts.js";
+import type { StartTriageInput } from "../../backend/src/domain/triageContracts.js";
+
+type ApiResponse<T> = {
+  result?: { data?: T };
+  error?: { message?: string };
+};
+
+type StartTriageResult = { triageExecutionId: string };
+
+async function call<T>(procedure: string, input?: unknown, mutation = false): Promise<T> {
+  const query = input === undefined ? "" : `?input=${encodeURIComponent(JSON.stringify(input))}`;
+  const response = await fetch(`/trpc/${procedure}${mutation ? "" : query}`, {
+    method: mutation ? "POST" : "GET",
+    ...(mutation
+      ? { headers: { "content-type": "application/json" }, body: JSON.stringify(input) }
+      : {}),
+  });
+  const body = (await response.json()) as ApiResponse<T>;
+  if (!response.ok || body.result?.data === undefined) {
+    throw new Error(body.error?.message ?? "Não foi possível concluir a solicitação.");
+  }
+  return body.result.data;
+}
+
+export function listTickets(): Promise<TicketList> {
+  return call<TicketList>("tickets.list", { page: 1, pageSize: 50 });
+}
+
+export function getTicket(ticketId: number): Promise<TicketDetails> {
+  return call<TicketDetails>("tickets.byId", { ticketId });
+}
+
+export function createTicket(input: TicketContent): Promise<Ticket> {
+  return call<Ticket>("tickets.create", input, true);
+}
+
+export function startTriage(input: StartTriageInput): Promise<StartTriageResult> {
+  return call<StartTriageResult>("triages.start", input, true);
+}
+
+export function startImplementation(input: {
+  ticketId: number;
+  expectedVersion: number;
+  requestKey: string;
+}): Promise<StartImplementationResult> {
+  return call<StartImplementationResult>("implementations.start", input, true);
+}

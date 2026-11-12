@@ -92,20 +92,21 @@ try {
           timeoutSeconds: targetConfig.kiroTimeoutSeconds,
         })
       : undefined;
-  let sourceHashes: Record<string, string> = {};
-  if (targetConfig) {
+  const readImplementationEnvironment = async () => {
+    if (!targetConfig) return { ready: false, sourceHashes: {} };
     try {
       const sources = await collectAuthorizedSources(
         resolve(root, targetConfig.repositoryRoot),
         targetConfig,
       );
-      sourceHashes = Object.fromEntries(
+      const sourceHashes = Object.fromEntries(
         sources.map(({ path, text }) => [path, createHash("sha256").update(text).digest("hex")]),
       );
+      return { ready: Object.keys(sourceHashes).length > 0, sourceHashes };
     } catch {
-      sourceHashes = {};
+      return { ready: false, sourceHashes: {} };
     }
-  }
+  };
   if (environment.DATABASE_URL) {
     database = createDatabase(environment.DATABASE_URL);
     database.pool.on("error", () =>
@@ -128,7 +129,7 @@ try {
           triageService: createTriageService(createTriageRepository(database), triageRunner),
           implementationService: createImplementationService(
             createImplementationRepository(database),
-            { ready: Object.keys(sourceHashes).length > 0, sourceHashes },
+            readImplementationEnvironment,
             createGithubClient(environment.GH_TOKEN ? { token: environment.GH_TOKEN } : {}),
             createPipelineReportCollector({
               applicationRoot: root,

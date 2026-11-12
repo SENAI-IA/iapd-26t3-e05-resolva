@@ -26,12 +26,21 @@ const workflowConfigSchema = z.object({
   baseBranch: z.string().min(1),
 });
 
+type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes">;
+type RuntimeEnvironmentProvider =
+  | RuntimeEnvironment
+  | (() => RuntimeEnvironment | Promise<RuntimeEnvironment>);
+
 export function createImplementationService(
   repository: ImplementationRepository,
-  environment: Pick<ImplementationEnvironment, "ready" | "sourceHashes">,
+  environment: RuntimeEnvironmentProvider,
   github?: GithubClient,
   reports?: PipelineReportCollector,
 ) {
+  async function currentEnvironment() {
+    return typeof environment === "function" ? await environment() : environment;
+  }
+
   async function applyCallback(callback: PipelineCallback) {
     if (callback.status !== "success") return repository.applyPipelineCallback(callback);
     const proposal = await repository.registerSuccessProposal(callback);
@@ -167,14 +176,16 @@ export function createImplementationService(
   }
 
   return {
-    environment() {
+    async environment() {
+      const current = await currentEnvironment();
       return {
-        ready: environment.ready,
-        sourceCount: Object.keys(environment.sourceHashes).length,
+        ready: current.ready,
+        sourceCount: Object.keys(current.sourceHashes).length,
       };
     },
-    queue(input?: ImplementationQueueInput) {
-      return repository.queue(input ?? implementationQueueInputSchema.parse({}), environment);
+    async queue(input?: ImplementationQueueInput) {
+      const current = await currentEnvironment();
+      return repository.queue(input ?? implementationQueueInputSchema.parse({}), current);
     },
     list(input?: ImplementationListInput) {
       return repository.list(input ?? implementationListInputSchema.parse({}));
@@ -263,7 +274,8 @@ export function createImplementationService(
       return repository.applyDispatchObservation(input, state.context.checkpointFingerprint, run);
     },
     async start(input: StartImplementationInput) {
-      const { id, reservation } = await repository.reserve(input, environment);
+      const current = await currentEnvironment();
+      const { id, reservation } = await repository.reserve(input, current);
       if (reservation) await dispatchWorkflow(reservation);
       return { implementationExecutionId: id };
     },

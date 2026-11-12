@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,7 @@ import { createTriageRepository } from "./repository/triageRepository.js";
 import { createImplementationRepository } from "./repository/implementationRepository.js";
 import { createGithubClient } from "./integrations/github/cli.js";
 import { createServer } from "./server.js";
+import { createKiroTriageRunner } from "./integrations/kiro/triageRunner.js";
 import { createTicketService } from "./services/ticketService.js";
 import { createTriageService } from "./services/triageService.js";
 import { createImplementationService } from "./services/implementationService.js";
@@ -33,6 +35,18 @@ function shutdown() {
   return shutdownPromise;
 }
 
+function findKiroExecutable() {
+  try {
+    const executable = execFileSync("which", ["kiro-cli"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return executable || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 process.once("SIGINT", () => void shutdown());
 process.once("SIGTERM", () => void shutdown());
 
@@ -52,6 +66,21 @@ try {
       );
     }
   }
+  const kiroExecutable =
+    targetConfig && environment.KIRO_API_KEY ? findKiroExecutable() : undefined;
+  const triageRunner =
+    targetConfig && environment.KIRO_API_KEY && kiroExecutable
+      ? createKiroTriageRunner({
+          applicationRoot: root,
+          executable: kiroExecutable,
+          model: targetConfig.kiroModel,
+          apiKey: environment.KIRO_API_KEY,
+          secretValues: [environment.GH_TOKEN, environment.DATABASE_URL].filter(
+            (value): value is string => Boolean(value),
+          ),
+          timeoutSeconds: targetConfig.kiroTimeoutSeconds,
+        })
+      : undefined;
   if (environment.DATABASE_URL) {
     database = createDatabase(environment.DATABASE_URL);
     database.pool.on("error", () =>
@@ -66,7 +95,7 @@ try {
             categories,
             targetConfig,
           ),
-          triageService: createTriageService(createTriageRepository(database)),
+          triageService: createTriageService(createTriageRepository(database), triageRunner),
           implementationService: createImplementationService(
             createImplementationRepository(database),
             { ready: false, sourceHashes: {} },

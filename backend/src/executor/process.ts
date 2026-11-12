@@ -12,6 +12,7 @@ export interface CommandInput {
   cwd: string;
   timeoutMs: number;
   env?: Readonly<Record<string, string>>;
+  stdin?: string;
   maxOutputBytes?: number;
 }
 
@@ -86,8 +87,11 @@ export function runCommand(input: CommandInput): Promise<CommandResult> {
       env: environment,
       shell: false,
       detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
+    if (input.stdin !== undefined) {
+      child.stdin?.end(input.stdin);
+    }
 
     const stop = (reason: Exclude<CommandFailure, null>) => {
       if (failure) return;

@@ -6,7 +6,8 @@ import {
 import type { TriageRepository } from "../repository/triageRepository.js";
 
 type Reservation = NonNullable<Awaited<ReturnType<TriageRepository["reserve"]>>["reservation"]>;
-type TriageRunner = (reservation: Reservation) => Promise<unknown>;
+export type TriageReservation = Reservation;
+export type TriageRunner = (reservation: Reservation) => Promise<unknown>;
 
 export function createTriageService(repository: TriageRepository, run?: TriageRunner) {
   const jobs = new Set<Promise<void>>();

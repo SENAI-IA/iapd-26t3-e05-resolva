@@ -24,6 +24,20 @@ describe("supervisor de processos", () => {
     });
   });
 
+  it("envia entrada controlada sem habilitar shell", async () => {
+    const result = await runCommand({
+      executable: process.execPath,
+      args: [
+        "-e",
+        "let value=''; process.stdin.setEncoding('utf8'); process.stdin.on('data', chunk => value += chunk); process.stdin.on('end', () => process.stdout.write(value))",
+      ],
+      cwd: process.cwd(),
+      timeoutMs: 5_000,
+      stdin: "contexto autorizado",
+    });
+    expect(result).toMatchObject({ exitCode: 0, stdout: "contexto autorizado" });
+  });
+
   it("encerra processo que excede o tempo limite", async () => {
     const result = await runCommand({
       executable: process.execPath,

@@ -7,6 +7,12 @@ import {
   ticketSchema,
 } from "./contracts.js";
 
+export const publicEnvironmentSchema = z.strictObject({
+  ready: z.boolean(),
+  sourceCount: z.number().int().nonnegative(),
+});
+export type PublicEnvironment = z.infer<typeof publicEnvironmentSchema>;
+
 export const implementationQueueSchema = z.strictObject({
   ticket: ticketSchema,
   eligibility: eligibilityResultSchema,

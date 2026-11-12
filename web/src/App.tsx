@@ -5,9 +5,13 @@ import type {
   TicketDetails,
   TicketEvents,
 } from "../../backend/src/domain/contracts.js";
-import type { ImplementationQueueResult } from "../../backend/src/domain/implementationContracts.js";
+import type {
+  ImplementationQueueResult,
+  PublicEnvironment,
+} from "../../backend/src/domain/implementationContracts.js";
 import {
   createTicket,
+  getImplementationEnvironment,
   getTicket,
   getTicketEvents,
   listImplementationQueue,
@@ -41,6 +45,7 @@ const emptyForm: TicketContent = {
 function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
+  const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
@@ -54,12 +59,14 @@ function App() {
   async function refreshTickets(selectedId?: number) {
     setLoading(true);
     try {
-      const [result, implementationQueue] = await Promise.all([
+      const [result, implementationQueue, implementationEnvironment] = await Promise.all([
         listTickets(),
         listImplementationQueue(),
+        getImplementationEnvironment(),
       ]);
       setTickets(result.items);
       setQueue(implementationQueue.items);
+      setEnvironment(implementationEnvironment);
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
         const [detail, history] = await Promise.all([getTicket(nextId), getTicketEvents(nextId)]);
@@ -218,8 +225,12 @@ function App() {
           </div>
           <div className="mt-8 border-t border-line pt-5">
             <div className="flex items-baseline justify-between gap-3">
-              <h3 className="font-semibold">Fila de implementação</h3>
-              <span className="text-xs text-muted">{queue.length}</span>
+              <h3 className="font-semibold">Fila de implementação ({queue.length})</h3>
+              <span className={`text-xs ${environment?.ready ? "text-emerald-700" : "text-muted"}`}>
+                {environment?.ready
+                  ? `${environment.sourceCount} fontes disponíveis`
+                  : "Ambiente pendente"}
+              </span>
             </div>
             {queue.length === 0 ? (
               <p className="mt-3 text-sm text-muted">Nenhum ticket elegível.</p>

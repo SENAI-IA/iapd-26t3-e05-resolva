@@ -105,8 +105,7 @@ O adaptador de triagem prepara um workspace descartável, gera o perfil Kiro V3 
 
 ## Callback de implementação
 
-O backend também expõe `implementations.queue`, `start`, `list`, `byId` e
-`callback`, `reconcile` e `reconcileDispatch`. O início padrão continua bloqueado até a integração do ambiente.
+O backend também expõe `implementations.environment`, `queue`, `start`, `list`, `byId`, `callback`, `reconcile` e `reconcileDispatch`. O início padrão continua bloqueado até a integração do ambiente.
 Callbacks são validados contra o snapshot da execução, vinculam um único workflow
 e ignoram mensagens já aplicadas, inclusive após a conclusão. A migração
 `0002_identidade_workflow.sql` preserva a identidade de workflows existentes.

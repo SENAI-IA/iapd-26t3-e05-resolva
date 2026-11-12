@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   implementationIdentitySchema,
   implementationListInputSchema,
@@ -6,6 +7,7 @@ import {
   implementationCallbackResultSchema,
   implementationQueueInputSchema,
   implementationQueueResultSchema,
+  publicEnvironmentSchema,
   startImplementationResultSchema,
   startImplementationSchema,
 } from "../../domain/implementationContracts.js";
@@ -17,6 +19,10 @@ import {
 import { implementationProcedure, router } from "../core.js";
 
 export const implementationsRouter = router({
+  environment: implementationProcedure
+    .input(z.undefined().optional())
+    .output(publicEnvironmentSchema)
+    .query(({ ctx }) => ctx.implementations.environment()),
   queue: implementationProcedure
     .input(implementationQueueInputSchema.optional())
     .output(implementationQueueResultSchema)

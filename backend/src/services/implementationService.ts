@@ -167,6 +167,12 @@ export function createImplementationService(
   }
 
   return {
+    environment() {
+      return {
+        ready: environment.ready,
+        sourceCount: Object.keys(environment.sourceHashes).length,
+      };
+    },
     queue(input?: ImplementationQueueInput) {
       return repository.queue(input ?? implementationQueueInputSchema.parse({}), environment);
     },

@@ -5,8 +5,11 @@ import type {
   TicketEvents,
   TicketList,
 } from "../../backend/src/domain/contracts.js";
-import type { StartImplementationResult } from "../../backend/src/domain/implementationContracts.js";
-import type { ImplementationQueueResult } from "../../backend/src/domain/implementationContracts.js";
+import type {
+  ImplementationQueueResult,
+  PublicEnvironment,
+  StartImplementationResult,
+} from "../../backend/src/domain/implementationContracts.js";
 import type { StartTriageInput } from "../../backend/src/domain/triageContracts.js";
 
 type ApiResponse<T> = {
@@ -49,6 +52,10 @@ export function createTicket(input: TicketContent): Promise<Ticket> {
 
 export function startTriage(input: StartTriageInput): Promise<StartTriageResult> {
   return call<StartTriageResult>("triages.start", input, true);
+}
+
+export function getImplementationEnvironment(): Promise<PublicEnvironment> {
+  return call<PublicEnvironment>("implementations.environment");
 }
 
 export function listImplementationQueue(): Promise<ImplementationQueueResult> {

@@ -27,6 +27,7 @@ import {
   resolveTicket,
   startImplementation,
   startTriage,
+  updateTicket,
 } from "./api";
 
 type TicketEvent = TicketEvents["items"][number];
@@ -53,6 +54,7 @@ const emptyForm: TicketContent = {
 
 function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [totalTickets, setTotalTickets] = useState(0);
   const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
@@ -60,6 +62,10 @@ function App() {
   const [implementation, setImplementation] = useState<ImplementationDetail | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
+  const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<Ticket["status"] | "">("");
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,15 +78,23 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function refreshTickets(selectedId?: number) {
+  async function refreshTickets(selectedId?: number, requestedPage = page) {
     setLoading(true);
     try {
+      const ticketQuery = {
+        page: requestedPage,
+        pageSize: 15,
+        ...(search.trim() ? { q: search.trim() } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      };
       const [result, implementationQueue, implementationEnvironment] = await Promise.all([
-        listTickets(),
+        listTickets(ticketQuery),
         listImplementationQueue(),
         getImplementationEnvironment(),
       ]);
       setTickets(result.items);
+      setTotalTickets(result.total);
+      setPage(requestedPage);
       setQueue(implementationQueue.items);
       setEnvironment(implementationEnvironment);
       const nextId = selectedId ?? result.items[0]?.id;
@@ -140,18 +154,48 @@ function App() {
     }
   }
 
+  function startNewTicket() {
+    setEditingTicketId(null);
+    setForm(emptyForm);
+    setNotice(null);
+    setShowForm(true);
+  }
+
+  function editSelectedTicket() {
+    if (!selected) return;
+    setEditingTicketId(selected.ticket.id);
+    setForm({
+      targetSystemKey: selected.ticket.targetSystemKey,
+      title: selected.ticket.title,
+      description: selected.ticket.description,
+      expectedBehavior: selected.ticket.expectedBehavior,
+      reproductionSteps: selected.ticket.reproductionSteps,
+      category: selected.ticket.category,
+    });
+    setNotice(null);
+    setShowForm(true);
+  }
+
   async function submitTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      const ticket = await createTicket({
+      const content = {
         ...form,
         reproductionSteps: form.reproductionSteps?.trim() || null,
-      });
+      };
+      const ticket = editingTicketId
+        ? await updateTicket({
+            ...content,
+            ticketId: editingTicketId,
+            expectedVersion: selected?.ticket.version ?? 0,
+          })
+        : await createTicket(content);
       setForm(emptyForm);
+      setEditingTicketId(null);
       setShowForm(false);
-      setNotice(`${ticket.code} cadastrado.`);
+      setNotice(`${ticket.code} ${editingTicketId ? "atualizado" : "cadastrado"}.`);
       await refreshTickets(ticket.id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível cadastrar o ticket.");
@@ -297,6 +341,8 @@ function App() {
   const canReopen = selected?.ticket.status === "resolvido";
   const canAnalyze =
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
+  const canEdit =
+    selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
   const canImplement = selected?.ticket.status === "aguardando_implementacao";
 
   return (
@@ -309,10 +355,7 @@ function App() {
           </div>
           <button
             className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-            onClick={() => {
-              setNotice(null);
-              setShowForm(true);
-            }}
+            onClick={startNewTicket}
             type="button"
           >
             Novo ticket
@@ -335,7 +378,40 @@ function App() {
               Atualizar
             </button>
           </div>
-          {loading ? <p className="mt-8 text-sm text-muted">Carregando...</p> : null}
+          <form
+            className="mt-5 space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void refreshTickets(undefined, 1);
+            }}
+          >
+            <input
+              className="field mt-0"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por código ou título"
+              value={search}
+            />
+            <div className="flex gap-2">
+              <select
+                className="field mt-0"
+                onChange={(event) => setStatusFilter(event.target.value as Ticket["status"] | "")}
+                value={statusFilter}
+              >
+                <option value="">Todos os status</option>
+                {Object.entries(statusLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="rounded-lg border border-line px-3 text-sm font-semibold"
+                type="submit"
+              >
+                Buscar
+              </button>
+            </div>
+          </form>
           {!loading && tickets.length === 0 ? (
             <p className="mt-8 rounded-lg bg-canvas p-4 text-sm text-muted">
               Nenhum ticket cadastrado.
@@ -357,6 +433,29 @@ function App() {
                 <p className="mt-2 text-xs text-muted">{statusLabels[ticket.status]}</p>
               </button>
             ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-muted">
+            <span>
+              Página {page} · {totalTickets} ticket{totalTickets === 1 ? "" : "s"}
+            </span>
+            <div className="flex gap-2">
+              <button
+                className="rounded border border-line px-2 py-1 disabled:opacity-40"
+                disabled={page === 1 || loading}
+                onClick={() => void refreshTickets(undefined, page - 1)}
+                type="button"
+              >
+                Anterior
+              </button>
+              <button
+                className="rounded border border-line px-2 py-1 disabled:opacity-40"
+                disabled={page * 15 >= totalTickets || loading}
+                onClick={() => void refreshTickets(undefined, page + 1)}
+                type="button"
+              >
+                Próxima
+              </button>
+            </div>
           </div>
           <div className="mt-8 border-t border-line pt-5">
             <div className="flex items-baseline justify-between gap-3">
@@ -407,14 +506,22 @@ function App() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold">Cadastrar ticket</h2>
+                  <h2 className="text-lg font-semibold">
+                    {editingTicketId ? "Editar ticket" : "Cadastrar ticket"}
+                  </h2>
                   <p className="mt-1 text-sm text-muted">
-                    O cadastro não inicia triagem ou implementação.
+                    {editingTicketId
+                      ? "Alterações relevantes invalidam a triagem atual."
+                      : "O cadastro não inicia triagem ou implementação."}
                   </p>
                 </div>
                 <button
                   className="text-sm text-muted underline underline-offset-4"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => {
+                    setEditingTicketId(null);
+                    setForm(emptyForm);
+                    setShowForm(false);
+                  }}
                   type="button"
                 >
                   Cancelar
@@ -483,7 +590,13 @@ function App() {
                 disabled={saving}
                 type="submit"
               >
-                {saving ? "Salvando..." : "Cadastrar ticket"}
+                {saving
+                  ? editingTicketId
+                    ? "Salvando..."
+                    : "Salvando..."
+                  : editingTicketId
+                    ? "Salvar alterações"
+                    : "Cadastrar ticket"}
               </button>
             </form>
           ) : null}
@@ -695,6 +808,15 @@ function App() {
                 </ol>
               </div>
               <div className="mt-8 flex flex-wrap gap-3 border-t border-line pt-5">
+                {canEdit ? (
+                  <button
+                    className="rounded-lg border border-line px-4 py-2 text-sm font-semibold"
+                    onClick={editSelectedTicket}
+                    type="button"
+                  >
+                    Editar ticket
+                  </button>
+                ) : null}
                 {canAnalyze ? (
                   <button
                     className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"

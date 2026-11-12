@@ -1,4 +1,5 @@
 import type {
+  ListTicketsInput,
   Ticket,
   TicketContent,
   TicketDetails,
@@ -36,8 +37,10 @@ async function call<T>(procedure: string, input?: unknown, mutation = false): Pr
   return body.result.data;
 }
 
-export function listTickets(): Promise<TicketList> {
-  return call<TicketList>("tickets.list", { page: 1, pageSize: 50 });
+export function listTickets(
+  input: ListTicketsInput = { page: 1, pageSize: 15 },
+): Promise<TicketList> {
+  return call<TicketList>("tickets.list", input);
 }
 
 export function getTicket(ticketId: number): Promise<TicketDetails> {
@@ -54,6 +57,15 @@ export function getTriage(triageId: string): Promise<TriageDetail> {
 
 export function createTicket(input: TicketContent): Promise<Ticket> {
   return call<Ticket>("tickets.create", input, true);
+}
+
+export function updateTicket(
+  input: TicketContent & {
+    ticketId: number;
+    expectedVersion: number;
+  },
+): Promise<Ticket> {
+  return call<Ticket>("tickets.update", input, true);
 }
 
 export function provideTicketInformation(input: {

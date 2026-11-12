@@ -6,6 +6,7 @@ import type { TriageRunner } from "../../services/triageService.js";
 import { runKiroTriage } from "./client.js";
 
 const maximumSourceFiles = 100;
+const maximumSourceFileBytes = 128 * 1024;
 const maximumSourceBytes = 512 * 1024;
 const ignoredDirectories = new Set([".git", ".kiro", ".resolva", "node_modules"]);
 
@@ -32,7 +33,8 @@ export async function collectAuthorizedSources(root: string, config: TargetSyste
       }
       return;
     }
-    if (entry.isFile() && files.length < maximumSourceFiles) files.push(path);
+    if (entry.isFile() && entry.size <= maximumSourceFileBytes && files.length < maximumSourceFiles)
+      files.push(path);
   }
 
   for (const sourceRoot of roots) {

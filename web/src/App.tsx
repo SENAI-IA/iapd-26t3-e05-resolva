@@ -665,71 +665,117 @@ function App() {
                 </div>
               ) : null}
               {triage ? (
-                <section className="mt-8 rounded-lg bg-canvas p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="font-semibold">Resultado da triagem</h3>
-                    <span className="rounded-full bg-surface px-3 py-1 text-sm font-semibold">
-                      {triage.classification}
-                    </span>
-                  </div>
-                  <div className="mt-5 grid gap-5 md:grid-cols-2">
-                    <div>
-                      <h4 className="text-sm font-semibold">Resumo</h4>
-                      <p className="mt-1 text-sm leading-6 text-muted">{triage.summary}</p>
+                <>
+                  <section className="mt-8 rounded-lg bg-canvas p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="font-semibold">Resultado da triagem</h3>
+                      <span className="rounded-full bg-surface px-3 py-1 text-sm font-semibold">
+                        {triage.classification}
+                      </span>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-semibold">Diagnóstico</h4>
-                      <p className="mt-1 text-sm leading-6 text-muted">{triage.diagnosis}</p>
+                    <div className="mt-5 grid gap-5 md:grid-cols-2">
+                      <div>
+                        <h4 className="text-sm font-semibold">Resumo</h4>
+                        <p className="mt-1 text-sm leading-6 text-muted">{triage.summary}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold">Diagnóstico</h4>
+                        <p className="mt-1 text-sm leading-6 text-muted">{triage.diagnosis}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold">Comportamento observado</h4>
+                        <p className="mt-1 text-sm leading-6 text-muted">
+                          {triage.observedBehavior}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold">Próxima ação</h4>
+                        <p className="mt-1 text-sm leading-6 text-muted">{triage.nextAction}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-semibold">Comportamento observado</h4>
-                      <p className="mt-1 text-sm leading-6 text-muted">{triage.observedBehavior}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold">Próxima ação</h4>
-                      <p className="mt-1 text-sm leading-6 text-muted">{triage.nextAction}</p>
-                    </div>
-                  </div>
-                  {triage.questions.length > 0 ? (
-                    <div className="mt-5">
-                      <h4 className="text-sm font-semibold">Informações necessárias</h4>
-                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
-                        {triage.questions.map((question) => (
-                          <li key={question}>{question}</li>
-                        ))}
-                      </ul>
-                    </div>
+                    {triage.questions.length > 0 ? (
+                      <div className="mt-5">
+                        <h4 className="text-sm font-semibold">Informações necessárias</h4>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
+                          {triage.questions.map((question) => (
+                            <li key={question}>{question}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {triage.changeScope || triage.regressionTestPlan ? (
+                      <div className="mt-5 grid gap-5 md:grid-cols-2">
+                        {triage.changeScope ? (
+                          <div>
+                            <h4 className="text-sm font-semibold">Escopo da mudança</h4>
+                            <p className="mt-1 text-sm leading-6 text-muted">
+                              {triage.changeScope}
+                            </p>
+                          </div>
+                        ) : null}
+                        {triage.regressionTestPlan ? (
+                          <div>
+                            <h4 className="text-sm font-semibold">Plano de regressão</h4>
+                            <p className="mt-1 text-sm leading-6 text-muted">
+                              {triage.regressionTestPlan}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {triage.acceptanceCriteria.length > 0 ? (
+                      <div className="mt-5">
+                        <h4 className="text-sm font-semibold">Critérios de aceite</h4>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
+                          {triage.acceptanceCriteria.map((criterion) => (
+                            <li key={criterion}>{criterion}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {triage.references.length > 0 ? (
+                      <div className="mt-5">
+                        <h4 className="text-sm font-semibold">Referências consultadas</h4>
+                        <ul className="mt-2 space-y-1 text-sm text-muted">
+                          {triage.references.map((reference) => (
+                            <li key={`${reference.path}-${reference.startLine}`}>
+                              {reference.path}:{reference.startLine}-{reference.endLine}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </section>
+                  {canProvideInformation || canContest ? (
+                    <form
+                      className="mt-6 rounded-lg border border-line p-5"
+                      onSubmit={(event) => void submitTicketMessage(event)}
+                    >
+                      <h3 className="text-sm font-semibold">
+                        {canProvideInformation ? "Adicionar informação" : "Contestar triagem"}
+                      </h3>
+                      <textarea
+                        className="field min-h-24"
+                        minLength={1}
+                        required
+                        onChange={(event) => setMessage(event.target.value)}
+                        placeholder={
+                          canProvideInformation
+                            ? "Informe o dado que faltou para a triagem."
+                            : "Explique por que a triagem deve ser revisada."
+                        }
+                        value={message}
+                      />
+                      <button
+                        className="mt-4 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        disabled={messageSaving}
+                        type="submit"
+                      >
+                        {messageSaving ? "Enviando..." : "Registrar mensagem"}
+                      </button>
+                    </form>
                   ) : null}
-                </section>
-              ) : null}
-              {canProvideInformation || canContest ? (
-                <form
-                  className="mt-6 rounded-lg border border-line p-5"
-                  onSubmit={(event) => void submitTicketMessage(event)}
-                >
-                  <h3 className="text-sm font-semibold">
-                    {canProvideInformation ? "Adicionar informação" : "Contestar triagem"}
-                  </h3>
-                  <textarea
-                    className="field min-h-24"
-                    minLength={1}
-                    required
-                    onChange={(event) => setMessage(event.target.value)}
-                    placeholder={
-                      canProvideInformation
-                        ? "Informe o dado que faltou para a triagem."
-                        : "Explique por que a triagem deve ser revisada."
-                    }
-                    value={message}
-                  />
-                  <button
-                    className="mt-4 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    disabled={messageSaving}
-                    type="submit"
-                  >
-                    {messageSaving ? "Enviando..." : "Registrar mensagem"}
-                  </button>
-                </form>
+                </>
               ) : null}
               {canResolve ? (
                 <form
@@ -790,6 +836,52 @@ function App() {
                     {action === "reopen" ? "Reabrindo..." : "Reabrir ticket"}
                   </button>
                 </form>
+              ) : null}
+              {implementation ? (
+                <section className="mt-6 rounded-lg border border-line p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold">Execução de implementação</h3>
+                    <span className="rounded-full bg-canvas px-3 py-1 text-sm font-semibold">
+                      {implementation.execution.status}
+                    </span>
+                  </div>
+                  <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <dt className="text-muted">Etapa</dt>
+                      <dd className="mt-1 font-semibold">
+                        {implementation.execution.stage ?? "Não informada"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Rodada</dt>
+                      <dd className="mt-1 font-semibold">{implementation.execution.round}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Modo</dt>
+                      <dd className="mt-1 font-semibold">
+                        {implementation.execution.mode ?? "Não informado"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">SHA validado</dt>
+                      <dd className="mt-1 break-all font-semibold">
+                        {implementation.execution.validatedSha ?? "Pendente"}
+                      </dd>
+                    </div>
+                  </dl>
+                  {implementation.execution.outcome ? (
+                    <p className="mt-4 text-sm text-muted">{implementation.execution.outcome}</p>
+                  ) : null}
+                  {implementation.delivery ? (
+                    <div className="mt-4 border-t border-line pt-4 text-sm text-muted">
+                      Branch{" "}
+                      <strong className="text-ink">{implementation.delivery.branchName}</strong>
+                      {implementation.delivery.prState
+                        ? ` · PR ${implementation.delivery.prState}`
+                        : " · PR pendente"}
+                    </div>
+                  ) : null}
+                </section>
               ) : null}
               <div className="mt-8 border-t border-line pt-5">
                 <h3 className="text-sm font-semibold">Histórico</h3>

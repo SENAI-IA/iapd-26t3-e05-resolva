@@ -328,6 +328,19 @@ function App() {
                   {statusLabels[selected.ticket.status]}
                 </span>
               </div>
+              <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted">
+                {selected.latestExecution ? (
+                  <span className="rounded-full bg-canvas px-3 py-1">
+                    Execução: {selected.latestExecution.status}
+                    {selected.latestExecution.stage ? ` · ${selected.latestExecution.stage}` : ""}
+                  </span>
+                ) : null}
+                {selected.currentDelivery ? (
+                  <span className="rounded-full bg-canvas px-3 py-1">
+                    PR #{selected.currentDelivery.prNumber ?? "pendente"}
+                  </span>
+                ) : null}
+              </div>
               <div className="mt-8 grid gap-6 md:grid-cols-2">
                 <div>
                   <h3 className="text-sm font-semibold">Relato</h3>
@@ -386,6 +399,16 @@ function App() {
                   >
                     {action === "implementation" ? "Solicitando..." : "Iniciar implementação"}
                   </button>
+                ) : null}
+                {selected.currentDelivery?.prUrl ? (
+                  <a
+                    className="self-center text-sm font-semibold text-ink underline underline-offset-4"
+                    href={selected.currentDelivery.prUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Abrir Pull Request
+                  </a>
                 ) : null}
                 {selected.latestExecution ? (
                   <p className="self-center text-sm text-muted">

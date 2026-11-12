@@ -1,6 +1,20 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { Ticket, TicketContent, TicketDetails } from "../../backend/src/domain/contracts.js";
-import { createTicket, getTicket, listTickets, startImplementation, startTriage } from "./api";
+import type {
+  Ticket,
+  TicketContent,
+  TicketDetails,
+  TicketEvents,
+} from "../../backend/src/domain/contracts.js";
+import {
+  createTicket,
+  getTicket,
+  getTicketEvents,
+  listTickets,
+  startImplementation,
+  startTriage,
+} from "./api";
+
+type TicketEvent = TicketEvents["items"][number];
 
 const statusLabels: Record<Ticket["status"], string> = {
   aberto: "Aberto",
@@ -25,6 +39,7 @@ const emptyForm: TicketContent = {
 function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
+  const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -40,9 +55,12 @@ function App() {
       setTickets(result.items);
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
-        setSelected(await getTicket(nextId));
+        const [detail, history] = await Promise.all([getTicket(nextId), getTicketEvents(nextId)]);
+        setSelected(detail);
+        setEvents(history.items);
       } else {
         setSelected(null);
+        setEvents([]);
       }
       setError(null);
     } catch (cause) {
@@ -59,7 +77,9 @@ function App() {
   async function selectTicket(ticketId: number) {
     setAction(null);
     try {
-      setSelected(await getTicket(ticketId));
+      const [detail, history] = await Promise.all([getTicket(ticketId), getTicketEvents(ticketId)]);
+      setSelected(detail);
+      setEvents(history.items);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o ticket.");
@@ -330,6 +350,22 @@ function App() {
                   </p>
                 </div>
               ) : null}
+              <div className="mt-8 border-t border-line pt-5">
+                <h3 className="text-sm font-semibold">Histórico</h3>
+                <ol className="mt-3 space-y-3">
+                  {events.map((event) => (
+                    <li className="border-l-2 border-line pl-4" key={event.id}>
+                      <div className="flex flex-wrap justify-between gap-2 text-xs text-muted">
+                        <span className="font-semibold">{event.type}</span>
+                        <time dateTime={event.createdAt}>
+                          {new Date(event.createdAt).toLocaleString("pt-BR")}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-sm text-muted">{event.message}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
               <div className="mt-8 flex flex-wrap gap-3 border-t border-line pt-5">
                 {canAnalyze ? (
                   <button

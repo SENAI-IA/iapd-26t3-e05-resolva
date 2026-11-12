@@ -2,6 +2,7 @@ import type {
   Ticket,
   TicketContent,
   TicketDetails,
+  TicketEvents,
   TicketList,
 } from "../../backend/src/domain/contracts.js";
 import type { StartImplementationResult } from "../../backend/src/domain/implementationContracts.js";
@@ -35,6 +36,10 @@ export function listTickets(): Promise<TicketList> {
 
 export function getTicket(ticketId: number): Promise<TicketDetails> {
   return call<TicketDetails>("tickets.byId", { ticketId });
+}
+
+export function getTicketEvents(ticketId: number): Promise<TicketEvents> {
+  return call<TicketEvents>("tickets.events", { ticketId, page: 1, pageSize: 50 });
 }
 
 export function createTicket(input: TicketContent): Promise<Ticket> {

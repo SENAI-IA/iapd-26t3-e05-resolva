@@ -7,10 +7,10 @@ das tarefas 5–7 e 9; limites e evidências em [docs/tickets-api.md](docs/ticke
 As regras de domínio de triagem e elegibilidade (tarefa 32) estão implementadas;
 evidências em [docs/triagem-dominio.md](docs/triagem-dominio.md). A reserva e a
 conclusão de triagem são transacionais e as consultas estão disponíveis por tRPC.
-O adaptador de triagem Kiro está exercitado com processo simulado. A execução real
-pelo Kiro CLI headless permanece pendente. A primeira fatia da interface do MVP-1
-agora permite cadastrar, listar e consultar tickets, solicitar triagem e iniciar
-implementação; o acompanhamento avançado e a execução real continuam pendentes.
+O adaptador de triagem Kiro está ligado ao supervisor de processos e exercitado
+com processo simulado. A execução autenticada depende de configuração local,
+credencial e `kiro-cli` disponíveis no ambiente; a execução real pelo Kiro CLI
+headless permanece pendente de ensaio.
 
 A fila, a reserva manual e as consultas de implementação estão disponíveis no
 backend, com disparo pelo cliente `gh` em testes. O callback agora valida o

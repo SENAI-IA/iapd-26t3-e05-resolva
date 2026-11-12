@@ -70,6 +70,24 @@ export function contestTriage(input: {
   return call<Ticket>("tickets.contestTriage", input, true);
 }
 
+export function resolveTicket(input: {
+  ticketId: number;
+  expectedVersion: number;
+  mergeConfirmed: true;
+  testVerified: true;
+  message?: string;
+}): Promise<Ticket> {
+  return call<Ticket>("tickets.resolve", input, true);
+}
+
+export function reopenTicket(input: {
+  ticketId: number;
+  expectedVersion: number;
+  message: string;
+}): Promise<Ticket> {
+  return call<Ticket>("tickets.reopen", input, true);
+}
+
 export function startTriage(input: StartTriageInput): Promise<StartTriageResult> {
   return call<StartTriageResult>("triages.start", input, true);
 }

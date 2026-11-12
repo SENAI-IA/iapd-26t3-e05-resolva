@@ -20,6 +20,8 @@ import {
   listImplementationQueue,
   listTickets,
   provideTicketInformation,
+  reopenTicket,
+  resolveTicket,
   startImplementation,
   startTriage,
 } from "./api";
@@ -59,6 +61,9 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [messageSaving, setMessageSaving] = useState(false);
+  const [mergeConfirmed, setMergeConfirmed] = useState(false);
+  const [testVerified, setTestVerified] = useState(false);
+  const [decisionMessage, setDecisionMessage] = useState("");
   const [action, setAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -182,6 +187,52 @@ function App() {
     }
   }
 
+  async function resolveSelectedTicket(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || !mergeConfirmed || !testVerified) return;
+    setAction("resolve");
+    setError(null);
+    try {
+      await resolveTicket({
+        ticketId: selected.ticket.id,
+        expectedVersion: selected.ticket.version,
+        mergeConfirmed: true,
+        testVerified: true,
+        ...(decisionMessage.trim() ? { message: decisionMessage.trim() } : {}),
+      });
+      setNotice("Ticket resolvido.");
+      setDecisionMessage("");
+      setMergeConfirmed(false);
+      setTestVerified(false);
+      await refreshTickets(selected.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível resolver o ticket.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function reopenSelectedTicket(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || !decisionMessage.trim()) return;
+    setAction("reopen");
+    setError(null);
+    try {
+      await reopenTicket({
+        ticketId: selected.ticket.id,
+        expectedVersion: selected.ticket.version,
+        message: decisionMessage.trim(),
+      });
+      setNotice("Ticket reaberto.");
+      setDecisionMessage("");
+      await refreshTickets(selected.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível reabrir o ticket.");
+    } finally {
+      setAction(null);
+    }
+  }
+
   async function submitTicketMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected || !message.trim()) return;
@@ -211,6 +262,8 @@ function App() {
 
   const canProvideInformation = selected?.ticket.status === "aguardando_informacoes";
   const canContest = selected?.ticket.status === "recusado" && triage !== null;
+  const canResolve = selected?.ticket.status === "aguardando_revisao";
+  const canReopen = selected?.ticket.status === "resolvido";
   const canAnalyze =
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
   const canImplement = selected?.ticket.status === "aguardando_implementacao";
@@ -521,6 +574,66 @@ function App() {
                     type="submit"
                   >
                     {messageSaving ? "Enviando..." : "Registrar mensagem"}
+                  </button>
+                </form>
+              ) : null}
+              {canResolve ? (
+                <form
+                  className="mt-6 rounded-lg border border-line p-5"
+                  onSubmit={(event) => void resolveSelectedTicket(event)}
+                >
+                  <h3 className="text-sm font-semibold">Confirmar resolução</h3>
+                  <label className="mt-3 flex items-start gap-2 text-sm text-muted">
+                    <input
+                      checked={mergeConfirmed}
+                      onChange={(event) => setMergeConfirmed(event.target.checked)}
+                      type="checkbox"
+                    />
+                    O merge da Pull Request foi confirmado.
+                  </label>
+                  <label className="mt-2 flex items-start gap-2 text-sm text-muted">
+                    <input
+                      checked={testVerified}
+                      onChange={(event) => setTestVerified(event.target.checked)}
+                      type="checkbox"
+                    />
+                    A correção foi verificada em teste.
+                  </label>
+                  <textarea
+                    className="field min-h-20"
+                    onChange={(event) => setDecisionMessage(event.target.value)}
+                    placeholder="Mensagem opcional da resolução."
+                    value={decisionMessage}
+                  />
+                  <button
+                    className="mt-4 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    disabled={action !== null || !mergeConfirmed || !testVerified}
+                    type="submit"
+                  >
+                    {action === "resolve" ? "Resolvendo..." : "Confirmar resolução"}
+                  </button>
+                </form>
+              ) : null}
+              {canReopen ? (
+                <form
+                  className="mt-6 rounded-lg border border-line p-5"
+                  onSubmit={(event) => void reopenSelectedTicket(event)}
+                >
+                  <h3 className="text-sm font-semibold">Reabrir ticket</h3>
+                  <textarea
+                    className="field min-h-20"
+                    minLength={1}
+                    onChange={(event) => setDecisionMessage(event.target.value)}
+                    placeholder="Explique por que o ticket deve ser reaberto."
+                    required
+                    value={decisionMessage}
+                  />
+                  <button
+                    className="mt-4 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    disabled={action !== null}
+                    type="submit"
+                  >
+                    {action === "reopen" ? "Reabrindo..." : "Reabrir ticket"}
                   </button>
                 </form>
               ) : null}

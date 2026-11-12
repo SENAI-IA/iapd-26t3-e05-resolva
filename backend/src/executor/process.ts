@@ -89,10 +89,6 @@ export function runCommand(input: CommandInput): Promise<CommandResult> {
       detached: true,
       stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
-    if (input.stdin !== undefined) {
-      child.stdin?.end(input.stdin);
-    }
-
     const stop = (reason: Exclude<CommandFailure, null>) => {
       if (failure) return;
       failure = reason;
@@ -101,6 +97,12 @@ export function runCommand(input: CommandInput): Promise<CommandResult> {
       terminateProcessGroup(child, "SIGTERM");
       killTimer = setTimeout(() => terminateProcessGroup(child, "SIGKILL"), terminationGraceMs);
     };
+    if (input.stdin !== undefined) {
+      child.stdin?.once("error", () => {
+        if (!failure) failure = "spawn";
+      });
+      child.stdin?.end(input.stdin);
+    }
 
     child.stdout?.on("data", (chunk: Buffer) => {
       const result = appendLimited(stdout, chunk, maxOutputBytes, capturedOutputBytes);

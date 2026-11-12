@@ -17,6 +17,7 @@ import {
   assertEvidenceMatchesDispatch,
   type DispatchReconciliationInput,
 } from "../domain/implementationDispatch.js";
+import type { InstanceGuard } from "../executor/instanceGuard.js";
 import type { PipelineReportCollector } from "../integrations/ci/collectReport.js";
 import type { ParsedPipelineReport } from "../integrations/ci/report.js";
 
@@ -36,12 +37,18 @@ export function createImplementationService(
   environment: RuntimeEnvironmentProvider,
   github?: GithubClient,
   reports?: PipelineReportCollector,
+  instanceGuard?: Pick<InstanceGuard, "assertOwned">,
 ) {
   async function currentEnvironment() {
     return typeof environment === "function" ? await environment() : environment;
   }
 
+  async function assertInstanceOwned() {
+    await instanceGuard?.assertOwned();
+  }
+
   async function applyCallback(callback: PipelineCallback) {
+    await assertInstanceOwned();
     if (callback.status !== "success") return repository.applyPipelineCallback(callback);
     const proposal = await repository.registerSuccessProposal(callback);
     if (proposal.replay) return proposal.result;
@@ -54,6 +61,7 @@ export function createImplementationService(
       );
     let delivery;
     try {
+      await assertInstanceOwned();
       const workflow = await github.getWorkflowRun({
         repository: context.expected.repository,
         workflowId: callback.workflowId,
@@ -78,6 +86,7 @@ export function createImplementationService(
         "Não foi possível confirmar a execução no GitHub. A implementação permanece ativa para reconciliação.",
       );
     }
+    await assertInstanceOwned();
     return repository.applyPipelineCallback(callback, {
       callbackFingerprint: context.callbackFingerprint,
       validationFingerprint: context.validationFingerprint,
@@ -126,6 +135,7 @@ export function createImplementationService(
     let workflowDefinitionId: string;
     try {
       await assertGithubAvailability();
+      await assertInstanceOwned();
       const definition = await github.getWorkflowDefinition({
         repository: config.data.repository,
         workflow: config.data.workflowRef,
@@ -150,6 +160,7 @@ export function createImplementationService(
       );
     }
     try {
+      await assertInstanceOwned();
       await github.triggerWorkflow({
         repository: config.data.repository,
         workflow: workflowDefinitionId,
@@ -162,6 +173,7 @@ export function createImplementationService(
           branchName: reservation.branchName,
         },
       });
+      await assertInstanceOwned();
       await repository.markWorkflowDispatched(reservation.executionId);
     } catch {
       const confirmation = await repository.markWorkflowDispatchUnconfirmed(
@@ -198,6 +210,7 @@ export function createImplementationService(
       return applyCallback(await repository.pendingSuccessCallback(executionId));
     },
     async collectReport(executionId: string) {
+      await assertInstanceOwned();
       const state = await repository.prepareReportCollection(executionId);
       if (state.replay) return applyCallback(await repository.pendingSuccessCallback(executionId));
       if (!reports)
@@ -248,10 +261,12 @@ export function createImplementationService(
           "O relatório da pipeline está indisponível ou inválido. A execução permanece ativa.",
         );
       }
+      await assertInstanceOwned();
       await repository.recordValidationEvidence(collected.evidence, state.fingerprint);
       return applyCallback(collected.callback);
     },
     async reconcileDispatch(input: DispatchReconciliationInput) {
+      await assertInstanceOwned();
       const state = await repository.prepareDispatchReconciliation(input);
       if (state.replay) return state.result;
       if (!github)
@@ -271,9 +286,11 @@ export function createImplementationService(
           "Não foi possível consultar a workflow no GitHub. A execução permanece ativa para reconciliação.",
         );
       }
+      await assertInstanceOwned();
       return repository.applyDispatchObservation(input, state.context.checkpointFingerprint, run);
     },
     async start(input: StartImplementationInput) {
+      await assertInstanceOwned();
       const current = await currentEnvironment();
       const { id, reservation } = await repository.reserve(input, current);
       if (reservation) await dispatchWorkflow(reservation);

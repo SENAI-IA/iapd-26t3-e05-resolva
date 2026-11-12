@@ -139,6 +139,7 @@ try {
                 environment.DATABASE_URL,
               ].filter((value): value is string => Boolean(value)),
             }),
+            instanceGuard,
           ),
         }
       : {},

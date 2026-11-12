@@ -7,6 +7,7 @@ import type {
   TicketList,
 } from "../../backend/src/domain/contracts.js";
 import type {
+  ImplementationListResult,
   ImplementationQueueResult,
   ImplementationDetail,
   PublicEnvironment,
@@ -119,6 +120,10 @@ export function reconcileDispatch(input: {
 
 export function getImplementationEnvironment(): Promise<PublicEnvironment> {
   return call<PublicEnvironment>("implementations.environment");
+}
+
+export function listImplementations(): Promise<ImplementationListResult> {
+  return call<ImplementationListResult>("implementations.list", { page: 1, pageSize: 20 });
 }
 
 export function listImplementationQueue(): Promise<ImplementationQueueResult> {

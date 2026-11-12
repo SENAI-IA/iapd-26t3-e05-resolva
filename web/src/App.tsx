@@ -6,8 +6,9 @@ import type {
   TicketEvents,
 } from "../../backend/src/domain/contracts.js";
 import type {
-  ImplementationQueueResult,
   ImplementationDetail,
+  ImplementationListResult,
+  ImplementationQueueResult,
   PublicEnvironment,
 } from "../../backend/src/domain/implementationContracts.js";
 import type { TriageDetail } from "../../backend/src/domain/triageContracts.js";
@@ -20,6 +21,7 @@ import {
   getTicketEvents,
   getTriage,
   listImplementationQueue,
+  listImplementations,
   listTickets,
   provideTicketInformation,
   reconcileDispatch,
@@ -56,6 +58,7 @@ function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [totalTickets, setTotalTickets] = useState(0);
   const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
+  const [executions, setExecutions] = useState<ImplementationListResult["items"]>([]);
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [triage, setTriage] = useState<TriageDetail | null>(null);
@@ -87,15 +90,18 @@ function App() {
         ...(search.trim() ? { q: search.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
       };
-      const [result, implementationQueue, implementationEnvironment] = await Promise.all([
-        listTickets(ticketQuery),
-        listImplementationQueue(),
-        getImplementationEnvironment(),
-      ]);
+      const [result, implementationQueue, implementationList, implementationEnvironment] =
+        await Promise.all([
+          listTickets(ticketQuery),
+          listImplementationQueue(),
+          listImplementations(),
+          getImplementationEnvironment(),
+        ]);
       setTickets(result.items);
       setTotalTickets(result.total);
       setPage(requestedPage);
       setQueue(implementationQueue.items);
+      setExecutions(implementationList.items);
       setEnvironment(implementationEnvironment);
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
@@ -480,6 +486,31 @@ function App() {
                     <span className="font-semibold">{ticket.code}</span>
                     <span className="mt-1 block text-muted">
                       {eligibility.eligible ? "Pronto para iniciar" : eligibility.message}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="mt-8 border-t border-line pt-5">
+            <h3 className="font-semibold">Execuções recentes ({executions.length})</h3>
+            {executions.length === 0 ? (
+              <p className="mt-3 text-sm text-muted">Nenhuma execução registrada.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {executions.map(({ execution, ticket }) => (
+                  <button
+                    className="w-full rounded-lg border border-line p-3 text-left text-sm hover:border-ink"
+                    key={execution.id}
+                    onClick={() => void selectTicket(ticket.id)}
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{ticket.code}</span>
+                      <span className="text-xs text-muted">{execution.status}</span>
+                    </div>
+                    <span className="mt-1 block text-muted">
+                      {execution.stage ?? "Etapa não informada"}
                     </span>
                   </button>
                 ))}

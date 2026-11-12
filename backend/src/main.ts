@@ -126,7 +126,11 @@ try {
             categories,
             targetConfig,
           ),
-          triageService: createTriageService(createTriageRepository(database), triageRunner),
+          triageService: createTriageService(
+            createTriageRepository(database),
+            triageRunner,
+            instanceGuard,
+          ),
           implementationService: createImplementationService(
             createImplementationRepository(database),
             readImplementationEnvironment,

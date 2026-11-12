@@ -1,3 +1,5 @@
+import { type InstanceGuard } from "../executor/instanceGuard.js";
+import { DomainError } from "../domain/error.js";
 import {
   listTriagesSchema,
   type ListTriagesInput,
@@ -9,12 +11,27 @@ type Reservation = NonNullable<Awaited<ReturnType<TriageRepository["reserve"]>>[
 export type TriageReservation = Reservation;
 export type TriageRunner = (reservation: Reservation) => Promise<unknown>;
 
-export function createTriageService(repository: TriageRepository, run?: TriageRunner) {
+export function createTriageService(
+  repository: TriageRepository,
+  run?: TriageRunner,
+  instanceGuard?: Pick<InstanceGuard, "assertOwned">,
+) {
   const jobs = new Set<Promise<void>>();
+
+  async function assertInstanceOwned() {
+    try {
+      await instanceGuard?.assertOwned();
+    } catch {
+      throw new DomainError("PRECONDITION_FAILED", "A instância perdeu a posse do processamento.");
+    }
+  }
 
   async function execute(reservation: Reservation, runner: TriageRunner) {
     try {
-      await repository.complete(reservation.executionId, await runner(reservation));
+      await assertInstanceOwned();
+      const report = await runner(reservation);
+      await assertInstanceOwned();
+      await repository.complete(reservation.executionId, report);
     } catch {
       try {
         await repository.fail(reservation.executionId);
@@ -26,6 +43,7 @@ export function createTriageService(repository: TriageRepository, run?: TriageRu
 
   return {
     async start(input: StartTriageInput) {
+      await assertInstanceOwned();
       const { id, reservation } = await repository.reserve(input, run !== undefined);
       if (reservation && run) {
         const job = execute(reservation, run);

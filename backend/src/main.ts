@@ -10,6 +10,8 @@ import { defaultCategories } from "./domain/contracts.js";
 import { createTicketRepository } from "./repository/ticketRepository.js";
 import { createTriageRepository } from "./repository/triageRepository.js";
 import { createImplementationRepository } from "./repository/implementationRepository.js";
+import { createInstanceGuard, type InstanceGuard } from "./executor/instanceGuard.js";
+import { recoverInterruptedExecutions } from "./executor/recovery.js";
 import { createGithubClient } from "./integrations/github/cli.js";
 import { createServer } from "./server.js";
 import {
@@ -23,6 +25,7 @@ import { createPipelineReportCollector } from "./integrations/ci/collectReport.j
 
 let server: ReturnType<typeof createServer> | undefined;
 let database: AppDatabase | undefined;
+let instanceGuard: InstanceGuard | undefined;
 let shutdownPromise: Promise<void> | undefined;
 
 function shutdown() {
@@ -30,7 +33,11 @@ function shutdown() {
     try {
       await server?.close();
     } finally {
-      await database?.close();
+      try {
+        await instanceGuard?.release();
+      } finally {
+        await database?.close();
+      }
     }
   })().catch(() => {
     console.error("Não foi possível encerrar a API corretamente.");
@@ -104,6 +111,11 @@ try {
     database.pool.on("error", () =>
       console.error("A conexão com o banco de dados ficou indisponível."),
     );
+    instanceGuard = await createInstanceGuard(
+      database,
+      resolve(root, targetConfig?.workspaceRoot ?? ".resolva"),
+    );
+    await recoverInterruptedExecutions(database, instanceGuard);
   }
   server = createServer(
     database

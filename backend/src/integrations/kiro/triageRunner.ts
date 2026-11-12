@@ -10,6 +10,20 @@ const maximumSourceFileBytes = 128 * 1024;
 const maximumSourceBytes = 512 * 1024;
 const ignoredDirectories = new Set([".git", ".kiro", ".resolva", "node_modules"]);
 
+function isSafeSourcePath(path: string) {
+  return (
+    !/[!*?\u005b\u005d{}()|]/u.test(path) &&
+    path
+      .split("/")
+      .every(
+        (part) =>
+          !part.startsWith(".") &&
+          !/^(?:node_modules|id_(?:rsa|ed25519)|credentials(?:\.json)?)$/iu.test(part) &&
+          !/\.(?:pem|key|p12|pfx)$/iu.test(part),
+      )
+  );
+}
+
 function isInside(root: string, path: string) {
   const difference = relative(root, path);
   return (
@@ -33,7 +47,13 @@ export async function collectAuthorizedSources(root: string, config: TargetSyste
       }
       return;
     }
-    if (entry.isFile() && entry.size <= maximumSourceFileBytes && files.length < maximumSourceFiles)
+    const sourcePath = relative(root, path).split(sep).join("/");
+    if (
+      entry.isFile() &&
+      isSafeSourcePath(sourcePath) &&
+      entry.size <= maximumSourceFileBytes &&
+      files.length < maximumSourceFiles
+    )
       files.push(path);
   }
 

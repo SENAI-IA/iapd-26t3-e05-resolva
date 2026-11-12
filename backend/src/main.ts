@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +12,10 @@ import { createTriageRepository } from "./repository/triageRepository.js";
 import { createImplementationRepository } from "./repository/implementationRepository.js";
 import { createGithubClient } from "./integrations/github/cli.js";
 import { createServer } from "./server.js";
-import { createKiroTriageRunner } from "./integrations/kiro/triageRunner.js";
+import {
+  collectAuthorizedSources,
+  createKiroTriageRunner,
+} from "./integrations/kiro/triageRunner.js";
 import { createTicketService } from "./services/ticketService.js";
 import { createTriageService } from "./services/triageService.js";
 import { createImplementationService } from "./services/implementationService.js";
@@ -81,6 +85,20 @@ try {
           timeoutSeconds: targetConfig.kiroTimeoutSeconds,
         })
       : undefined;
+  let sourceHashes: Record<string, string> = {};
+  if (targetConfig) {
+    try {
+      const sources = await collectAuthorizedSources(
+        resolve(root, targetConfig.repositoryRoot),
+        targetConfig,
+      );
+      sourceHashes = Object.fromEntries(
+        sources.map(({ path, text }) => [path, createHash("sha256").update(text).digest("hex")]),
+      );
+    } catch {
+      sourceHashes = {};
+    }
+  }
   if (environment.DATABASE_URL) {
     database = createDatabase(environment.DATABASE_URL);
     database.pool.on("error", () =>
@@ -98,7 +116,7 @@ try {
           triageService: createTriageService(createTriageRepository(database), triageRunner),
           implementationService: createImplementationService(
             createImplementationRepository(database),
-            { ready: false, sourceHashes: {} },
+            { ready: Object.keys(sourceHashes).length > 0, sourceHashes },
             createGithubClient(environment.GH_TOKEN ? { token: environment.GH_TOKEN } : {}),
             createPipelineReportCollector({
               applicationRoot: root,

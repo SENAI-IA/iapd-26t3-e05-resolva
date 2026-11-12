@@ -17,7 +17,7 @@ function isInside(root: string, path: string) {
   );
 }
 
-async function collectSources(root: string, config: TargetSystemConfig) {
+export async function collectAuthorizedSources(root: string, config: TargetSystemConfig) {
   const files: string[] = [];
   const roots = [...new Set([...config.documentationPaths, ...config.allowedPaths])].sort();
 
@@ -66,7 +66,7 @@ export function createKiroTriageRunner(input: {
   return async (reservation) => {
     const config = reservation.ticket.targetConfigSnapshot as TargetSystemConfig;
     const repositoryRoot = resolve(input.applicationRoot, config.repositoryRoot);
-    const sources = await collectSources(repositoryRoot, config);
+    const sources = await collectAuthorizedSources(repositoryRoot, config);
     return runKiroTriage(
       {
         executionId: reservation.executionId,

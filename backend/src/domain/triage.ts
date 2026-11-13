@@ -96,6 +96,18 @@ export function canStartImplementation(
       message: "O ticket deve aguardar implementação. Analise o ticket antes de iniciar.",
     };
   }
+  if (
+    environment.targetSystemVersion !== undefined &&
+    environment.targetSystemVersion !== null &&
+    ticket.targetConfigVersion !== undefined &&
+    ticket.targetConfigVersion !== environment.targetSystemVersion
+  ) {
+    return {
+      eligible: false,
+      code: "TRIAGE_OUTDATED",
+      message: "A configuração do sistema-alvo mudou. Analise novamente o ticket antes de implementar.",
+    };
+  }
   if (!triage || !ticket.currentTriageId) {
     return {
       eligible: false,

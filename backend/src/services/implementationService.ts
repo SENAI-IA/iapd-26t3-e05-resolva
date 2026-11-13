@@ -32,6 +32,7 @@ const workflowConfigSchema = z.object({
 
 type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes"> & {
   targetSystem?: PublicTargetSystem | null;
+  targetSystemVersion?: number | null;
 };
 type RuntimeEnvironmentProvider =
   | RuntimeEnvironment

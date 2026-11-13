@@ -51,7 +51,9 @@ import {
 } from "./implementationCompletionRepository.js";
 
 type Transaction = Parameters<Parameters<AppDatabase["db"]["transaction"]>[0]>[0];
-type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes">;
+type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes"> & {
+  targetSystemVersion?: number | null;
+};
 
 type TriageRow = typeof triages.$inferSelect;
 type TicketRow = typeof tickets.$inferSelect;
@@ -67,6 +69,7 @@ function toImplementationTicket(ticket: Ticket): ImplementationTicket {
     status: ticket.status,
     classification: ticket.classification,
     currentTriageId: ticket.currentTriageId,
+    targetConfigVersion: ticket.targetConfigVersion,
   };
 }
 

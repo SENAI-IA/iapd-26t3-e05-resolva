@@ -116,6 +116,7 @@ export interface ImplementationEnvironment {
   ready: boolean;
   activeExecutionId: string | null;
   sourceHashes: Readonly<Record<string, string>>;
+  targetSystemVersion?: number | null;
 }
 
 export const targetSystemKeySchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
@@ -188,7 +189,7 @@ export type Ticket = z.infer<typeof ticketSchema>;
 export type ImplementationTicket = Pick<
   Ticket,
   "id" | "version" | "status" | "classification" | "currentTriageId"
->;
+> & { targetConfigVersion?: Ticket["targetConfigVersion"] };
 export const ticketListSchema = z.strictObject({
   items: z.array(ticketSchema),
   total: z.number().int().nonnegative(),

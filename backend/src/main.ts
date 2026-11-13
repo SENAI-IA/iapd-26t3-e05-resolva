@@ -104,7 +104,8 @@ try {
           categories: targetConfig.categories,
         }
       : null;
-    if (!targetConfig) return { ready: false, sourceHashes: {}, targetSystem };
+    const targetSystemVersion = targetConfig?.version ?? null;
+    if (!targetConfig) return { ready: false, sourceHashes: {}, targetSystem, targetSystemVersion };
     try {
       const sources = await collectAuthorizedSources(
         resolve(root, targetConfig.repositoryRoot),
@@ -113,7 +114,12 @@ try {
       const sourceHashes = Object.fromEntries(
         sources.map(({ path, text }) => [path, createHash("sha256").update(text).digest("hex")]),
       );
-      return { ready: Object.keys(sourceHashes).length > 0, sourceHashes, targetSystem };
+      return {
+        ready: Object.keys(sourceHashes).length > 0,
+        sourceHashes,
+        targetSystem,
+        targetSystemVersion,
+      };
     } catch {
       return { ready: false, sourceHashes: {}, targetSystem };
     }

@@ -119,6 +119,31 @@ describe("implementação transacional", () => {
     ]);
   });
 
+  it("consulta eventos em ordem e respeita o cursor", async () => {
+    const { executionId } = await reserveImplementation();
+    await resource.database.pool.query(
+      `INSERT INTO execution_events(execution_id,sequence,type,stage,message,payload)
+       VALUES ($1,2,'started','preparando_ambiente','Execução iniciada','{}'),
+              ($1,3,'workflow_dispatched','preparando_ambiente','Workflow disparada','{}')`,
+      [executionId],
+    );
+
+    await expect(
+      repository.events({ executionId, afterSequence: 1, limit: 1 }),
+    ).resolves.toMatchObject({
+      items: [{ sequence: 2, type: "started" }],
+      nextSequence: 2,
+      hasMore: true,
+    });
+    await expect(
+      repository.events({ executionId, afterSequence: 2, limit: 100 }),
+    ).resolves.toMatchObject({
+      items: [{ sequence: 3, type: "workflow_dispatched" }],
+      nextSequence: 3,
+      hasMore: false,
+    });
+  });
+
   it("faz rollback da reserva quando a entrega não pode ser criada", async () => {
     const ticketId = await eligibleTicket();
     await resource.database.pool.query(

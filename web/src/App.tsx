@@ -1038,6 +1038,29 @@ function App() {
                   {implementation.execution.outcome ? (
                     <p className="mt-4 text-sm text-muted">{implementation.execution.outcome}</p>
                   ) : null}
+                  {implementation.validation ? (
+                    <div className="mt-4 border-t border-line pt-4">
+                      <h4 className="text-sm font-semibold">Validação</h4>
+                      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                        {(["baseline", "regression", "final"] as const).map((phase) => {
+                          const result = implementation.validation?.[phase];
+                          return (
+                            <div key={phase}>
+                              <dt className="text-muted">{phase}</dt>
+                              <dd className="mt-1 font-semibold">
+                                {result?.status === "passed" ? "Aprovado" : "Falhou"} ·{" "}
+                                {result?.passed}/{result?.total}
+                              </dd>
+                            </div>
+                          );
+                        })}
+                      </dl>
+                      <p className="mt-3 break-all text-xs text-muted">
+                        Teste: {implementation.validation.test.path} · Relatório:{" "}
+                        {implementation.validation.report.relativePath}
+                      </p>
+                    </div>
+                  ) : null}
                   {implementation.delivery ? (
                     <div className="mt-4 border-t border-line pt-4 text-sm text-muted">
                       Branch{" "}

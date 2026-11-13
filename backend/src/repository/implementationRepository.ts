@@ -29,6 +29,7 @@ import {
   type StartImplementationInput,
 } from "../domain/implementationContracts.js";
 import { DomainError } from "../domain/error.js";
+import { implementationEvidenceSchema } from "../domain/implementationEvidence.js";
 import { canStartImplementation } from "../domain/triage.js";
 import { transitionTicket } from "../domain/ticket.js";
 import { toTicket } from "./ticketRepository.js";
@@ -292,6 +293,26 @@ export function createImplementationRepository(database: AppDatabase) {
         .where(and(eq(executions.id, executionId), eq(executions.kind, "implementation")))
         .limit(1);
       if (!row) throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+      const [validationEvent] = await database.db
+        .select({ payload: executionEvents.payload })
+        .from(executionEvents)
+        .where(
+          and(
+            eq(executionEvents.executionId, executionId),
+            eq(executionEvents.type, "validation_approved"),
+          ),
+        )
+        .limit(1);
+      const validation = implementationEvidenceSchema.safeParse(validationEvent?.payload.evidence);
+      const validationData = validation.success
+        ? {
+            baseline: validation.data.baseline,
+            regression: validation.data.regression,
+            final: validation.data.final,
+            test: validation.data.test,
+            report: validation.data.report,
+          }
+        : null;
       return implementationDetailSchema.parse({
         execution: executionDetails(row.execution),
         ticket: toTicket(row.ticket, row.triage),
@@ -318,6 +339,7 @@ export function createImplementationRepository(database: AppDatabase) {
               prState: row.delivery.prState,
             }
           : null,
+        validation: validationData,
       });
     },
 

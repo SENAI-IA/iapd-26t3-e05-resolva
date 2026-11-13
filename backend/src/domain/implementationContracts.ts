@@ -157,10 +157,46 @@ export const implementationDeliverySchema = z.strictObject({
   prUrl: z.url().nullable(),
   prState: z.string().nullable(),
 });
+export const implementationValidationSchema = z.strictObject({
+  baseline: z.strictObject({
+    status: z.enum(["passed", "assertion_failed"]),
+    total: z.number().int().positive(),
+    passed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  regression: z.strictObject({
+    status: z.enum(["passed", "assertion_failed"]),
+    total: z.number().int().positive(),
+    passed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  final: z.strictObject({
+    status: z.enum(["passed", "assertion_failed"]),
+    total: z.number().int().positive(),
+    passed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  test: z.strictObject({
+    path: z.string().min(1),
+    frozenSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    finalSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+  }),
+  report: z.strictObject({
+    relativePath: z.string().min(1),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(64 * 1024),
+  }),
+});
+export type ImplementationValidation = z.infer<typeof implementationValidationSchema>;
 export const implementationDetailSchema = z.strictObject({
   execution: implementationExecutionSchema,
   ticket: ticketSchema,
   triage: implementationTriageSchema.nullable(),
   delivery: implementationDeliverySchema.nullable(),
+  validation: implementationValidationSchema.nullable(),
 });
 export type ImplementationDetail = z.infer<typeof implementationDetailSchema>;

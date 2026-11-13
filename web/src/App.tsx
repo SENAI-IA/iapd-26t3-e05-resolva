@@ -29,6 +29,7 @@ import {
   listTickets,
   provideTicketInformation,
   reconcileDispatch,
+  requestTicketChanges,
   reopenTicket,
   resolveTicket,
   startImplementation,
@@ -92,6 +93,7 @@ function App() {
   const [mergeConfirmed, setMergeConfirmed] = useState(false);
   const [testVerified, setTestVerified] = useState(false);
   const [decisionMessage, setDecisionMessage] = useState("");
+  const [changeKind, setChangeKind] = useState<"behavior" | "refinement">("behavior");
   const [action, setAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -368,6 +370,28 @@ function App() {
     }
   }
 
+  async function requestChangesForSelectedTicket(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || !decisionMessage.trim()) return;
+    setAction("request-changes");
+    setError(null);
+    try {
+      await requestTicketChanges({
+        ticketId: selected.ticket.id,
+        expectedVersion: selected.ticket.version,
+        kind: changeKind,
+        message: decisionMessage.trim(),
+      });
+      setNotice("Ajustes registrados. O ticket voltou para nova análise.");
+      setDecisionMessage("");
+      await refreshTickets(selected.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível registrar os ajustes.");
+    } finally {
+      setAction(null);
+    }
+  }
+
   async function resolveSelectedTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected || !mergeConfirmed || !testVerified) return;
@@ -444,6 +468,7 @@ function App() {
   const canProvideInformation = selected?.ticket.status === "aguardando_informacoes";
   const canContest = selected?.ticket.status === "recusado" && triage !== null;
   const canResolve = selected?.ticket.status === "aguardando_revisao";
+  const canRequestChanges = selected?.ticket.status === "aguardando_revisao";
   const canReopen = selected?.ticket.status === "resolvido";
   const canAnalyze =
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
@@ -989,6 +1014,42 @@ function App() {
                     </form>
                   ) : null}
                 </>
+              ) : null}
+              {canRequestChanges ? (
+                <form
+                  className="mt-6 rounded-lg border border-line p-5"
+                  onSubmit={(event) => void requestChangesForSelectedTicket(event)}
+                >
+                  <h3 className="text-sm font-semibold">Solicitar ajustes</h3>
+                  <label className="mt-3 text-sm font-semibold">
+                    Tipo de ajuste
+                    <select
+                      className="field"
+                      onChange={(event) =>
+                        setChangeKind(event.target.value as "behavior" | "refinement")
+                      }
+                      value={changeKind}
+                    >
+                      <option value="behavior">Comportamento</option>
+                      <option value="refinement">Refinamento de regra ou escopo</option>
+                    </select>
+                  </label>
+                  <textarea
+                    className="field min-h-20"
+                    minLength={1}
+                    onChange={(event) => setDecisionMessage(event.target.value)}
+                    placeholder="Descreva o ajuste necessário para a implementação."
+                    required
+                    value={decisionMessage}
+                  />
+                  <button
+                    className="mt-4 rounded-lg border border-line px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    disabled={action !== null}
+                    type="submit"
+                  >
+                    {action === "request-changes" ? "Registrando..." : "Solicitar ajustes"}
+                  </button>
+                </form>
               ) : null}
               {canResolve ? (
                 <form

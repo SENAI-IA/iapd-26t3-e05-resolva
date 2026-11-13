@@ -88,6 +88,15 @@ export function contestTriage(input: {
   return call<Ticket>("tickets.contestTriage", input, true);
 }
 
+export function requestTicketChanges(input: {
+  ticketId: number;
+  expectedVersion: number;
+  kind: "behavior" | "refinement";
+  message: string;
+}): Promise<Ticket> {
+  return call<Ticket>("tickets.requestChanges", input, true);
+}
+
 export function resolveTicket(input: {
   ticketId: number;
   expectedVersion: number;

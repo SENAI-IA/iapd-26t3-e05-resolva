@@ -16,6 +16,11 @@ export type TicketAction =
       triage: ImplementationTriage | null;
       environment: ImplementationEnvironment;
     }
+  | {
+      type: "request_changes";
+      kind: "behavior" | "refinement";
+      message: string;
+    }
   | { type: "resolve"; mergeConfirmed: boolean; testVerified: boolean };
 
 export function transitionTicket(current: TicketStatus, action: TicketAction): TicketStatus {
@@ -51,6 +56,9 @@ export function transitionTicket(current: TicketStatus, action: TicketAction): T
       break;
     case "reopen":
       if (current === "resolvido") return "aberto";
+      break;
+    case "request_changes":
+      if (current === "aguardando_revisao") return "aberto";
       break;
     case "resolve":
       if (current === "aguardando_revisao" && action.mergeConfirmed && action.testVerified)

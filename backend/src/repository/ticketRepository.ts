@@ -27,6 +27,11 @@ export type TicketMutation = { ticketId: number; expectedVersion: number } & (
       content: TicketContent;
       targetConfigSnapshot: TargetSystemConfigSnapshot;
     }
+  | {
+      type: "request_changes";
+      kind: "behavior" | "refinement";
+      message: string;
+    }
   | { type: "provide_information" | "contest_triage" | "reopen"; message: string }
   | {
       type: "resolve";
@@ -104,6 +109,7 @@ const eventTypes = {
   edit: "updated",
   provide_information: "information_provided",
   contest_triage: "triage_contested",
+  request_changes: "changes_requested",
   resolve: "resolved",
   reopen: "reopened",
 } as const;
@@ -293,6 +299,7 @@ export function createTicketRepository(database: AppDatabase) {
           payload.mergeConfirmed = input.mergeConfirmed;
           payload.testVerified = input.testVerified;
         }
+        if (input.type === "request_changes") payload.kind = input.kind;
         const message = "message" in input ? input.message : undefined;
         await tx.insert(ticketEvents).values({
           ticketId: input.ticketId,
@@ -303,7 +310,9 @@ export function createTicketRepository(database: AppDatabase) {
             message ??
             (input.type === "resolve"
               ? "Merge e verificação em teste confirmados pelo operador."
-              : "Conteúdo do ticket atualizado."),
+              : input.type === "request_changes"
+                ? "Ajustes solicitados para a implementação."
+                : "Conteúdo do ticket atualizado."),
           payload,
           createdAt: sql`clock_timestamp()`,
         });

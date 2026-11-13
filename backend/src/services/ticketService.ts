@@ -4,6 +4,7 @@ import {
   defaultCategories,
   listTicketsSchema,
   messageTicketSchema,
+  requestChangesSchema,
   resolveTicketSchema,
   ticketContentSchema,
   ticketEventsInputSchema,
@@ -73,6 +74,12 @@ export function createTicketService(
     },
     async contestTriage(input: unknown) {
       return repository.mutate({ ...validate(messageTicketSchema, input), type: "contest_triage" });
+    },
+    async requestChanges(input: unknown) {
+      return repository.mutate({
+        ...validate(requestChangesSchema, input),
+        type: "request_changes",
+      });
     },
     async resolve(input: unknown) {
       return repository.mutate({ ...validate(resolveTicketSchema, input), type: "resolve" });

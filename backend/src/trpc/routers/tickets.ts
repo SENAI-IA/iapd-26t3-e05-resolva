@@ -1,6 +1,7 @@
 import {
   listTicketsSchema,
   messageTicketSchema,
+  requestChangesSchema,
   resolveTicketSchema,
   ticketContentSchema,
   ticketDetailsSchema,
@@ -42,6 +43,10 @@ export const ticketsRouter = router({
     .input(messageTicketSchema)
     .output(ticketSchema)
     .mutation(({ ctx, input }) => ctx.tickets.contestTriage(input)),
+  requestChanges: ticketProcedure
+    .input(requestChangesSchema)
+    .output(ticketSchema)
+    .mutation(({ ctx, input }) => ctx.tickets.requestChanges(input)),
   resolve: ticketProcedure
     .input(resolveTicketSchema)
     .output(ticketSchema)

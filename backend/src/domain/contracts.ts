@@ -151,6 +151,11 @@ export const updateTicketSchema = ticketContentSchema.extend(ticketVersionSchema
 export const messageTicketSchema = ticketVersionSchema.extend({
   message: text().min(1).max(10000),
 });
+export const requestChangesSchema = ticketVersionSchema.extend({
+  kind: z.enum(["behavior", "refinement"]),
+  message: text().min(1).max(10000),
+});
+export type RequestChangesInput = z.infer<typeof requestChangesSchema>;
 export const resolveTicketSchema = ticketVersionSchema.extend({
   mergeConfirmed: z.literal(true),
   testVerified: z.literal(true),

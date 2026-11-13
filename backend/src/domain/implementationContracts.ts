@@ -138,6 +138,25 @@ export const implementationEventsSchema = z.strictObject({
 });
 export type ImplementationEvents = z.infer<typeof implementationEventsSchema>;
 
+export const implementationArtifactIdentitySchema = implementationIdentitySchema.extend({
+  artifactId: z.uuid(),
+});
+export const implementationArtifactSchema = z.strictObject({
+  id: z.uuid(),
+  kind: z.string().min(1),
+  relativePath: z.string().min(1),
+  contentType: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/u),
+  createdAt: isoDate,
+});
+export const implementationArtifactResultSchema = z.strictObject({
+  artifact: implementationArtifactSchema,
+  content: z.string().max(64 * 1024),
+});
+export type ImplementationArtifactIdentity = z.infer<typeof implementationArtifactIdentitySchema>;
+export type ImplementationArtifactResult = z.infer<typeof implementationArtifactResultSchema>;
+
 export const implementationTriageSchema = z.strictObject({
   id: z.uuid(),
   ticketVersion: z.number().int().positive(),
@@ -182,6 +201,7 @@ export const implementationValidationSchema = z.strictObject({
     finalSha256: z.string().regex(/^[a-f0-9]{64}$/u),
   }),
   report: z.strictObject({
+    artifactId: z.uuid().nullable(),
     relativePath: z.string().min(1),
     sha256: z.string().regex(/^[a-f0-9]{64}$/u),
     sizeBytes: z

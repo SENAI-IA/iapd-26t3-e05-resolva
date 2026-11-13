@@ -3,6 +3,7 @@ import { z } from "zod";
 import { githubRepositorySchema, githubBranchSchema } from "../integrations/github/contracts.js";
 import type { AppDatabase } from "../db/index.js";
 import {
+  artifacts,
   executionEvents,
   executions,
   deliveries,
@@ -283,6 +284,37 @@ export function createImplementationRepository(database: AppDatabase) {
       };
     },
 
+    async artifact(executionId: string, artifactId: string) {
+      const [row] = await database.db
+        .select({ artifact: artifacts, execution: executions })
+        .from(artifacts)
+        .innerJoin(executions, eq(executions.id, artifacts.executionId))
+        .where(
+          and(
+            eq(artifacts.id, artifactId),
+            eq(artifacts.executionId, executionId),
+            eq(executions.kind, "implementation"),
+          ),
+        )
+        .limit(1);
+      if (!row) throw new DomainError("NOT_FOUND", "Artefato da execução não encontrado.");
+      const artifactRoot = z.string().min(1).safeParse(row.execution.configSnapshot.artifactRoot);
+      if (!artifactRoot.success)
+        throw new DomainError("PRECONDITION_FAILED", "A raiz do artefato não está disponível.");
+      return {
+        artifact: {
+          id: row.artifact.id,
+          kind: row.artifact.kind,
+          relativePath: row.artifact.relativePath,
+          contentType: row.artifact.contentType,
+          sizeBytes: row.artifact.sizeBytes,
+          sha256: row.artifact.sha256,
+          createdAt: row.artifact.createdAt.toISOString(),
+        },
+        artifactRoot: artifactRoot.data,
+      };
+    },
+
     async byId(executionId: string) {
       const [row] = await database.db
         .select({ execution: executions, ticket: tickets, triage: triages, delivery: deliveries })
@@ -304,13 +336,28 @@ export function createImplementationRepository(database: AppDatabase) {
         )
         .limit(1);
       const validation = implementationEvidenceSchema.safeParse(validationEvent?.payload.evidence);
+      const [validationArtifact] = validation.success
+        ? await database.db
+            .select({ id: artifacts.id })
+            .from(artifacts)
+            .where(
+              and(
+                eq(artifacts.executionId, executionId),
+                eq(artifacts.relativePath, validation.data.report.relativePath),
+              ),
+            )
+            .limit(1)
+        : [];
       const validationData = validation.success
         ? {
             baseline: validation.data.baseline,
             regression: validation.data.regression,
             final: validation.data.final,
             test: validation.data.test,
-            report: validation.data.report,
+            report: {
+              artifactId: validationArtifact?.id ?? null,
+              ...validation.data.report,
+            },
           }
         : null;
       return implementationDetailSchema.parse({

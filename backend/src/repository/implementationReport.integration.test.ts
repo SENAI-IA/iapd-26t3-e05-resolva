@@ -170,6 +170,13 @@ describe("coleta de relatório e conclusão", () => {
     }
     const detail = await repository.byId(test.id);
     expect(detail.execution).toMatchObject({ status: "concluida", validatedSha: "a".repeat(40) });
+    expect(detail.validation?.report.artifactId).toEqual(expect.any(String));
+    const artifactId = detail.validation?.report.artifactId;
+    if (!artifactId) throw new Error("Artefato de validação não identificado.");
+    await expect(test.service.artifact(test.id, artifactId)).resolves.toMatchObject({
+      artifact: { id: artifactId, kind: "validation_report" },
+      content: expect.stringContaining("[REDACTED]"),
+    });
     expect(detail.ticket.status).toBe("aguardando_revisao");
     const artifacts = await resource.database.pool.query(
       "SELECT relative_path,sha256 FROM artifacts WHERE execution_id=$1",

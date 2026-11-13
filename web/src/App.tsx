@@ -18,6 +18,7 @@ import {
   createTicket,
   collectImplementationReport,
   getImplementation,
+  getImplementationArtifact,
   getImplementationEnvironment,
   getImplementationEvents,
   getTicket,
@@ -75,6 +76,7 @@ function App() {
   const [implementationEvents, setImplementationEvents] = useState<ImplementationEvents["items"]>(
     [],
   );
+  const [validationReport, setValidationReport] = useState<string | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
@@ -141,6 +143,7 @@ function App() {
         setTriage(null);
         setImplementation(null);
         setImplementationEvents([]);
+        setValidationReport(null);
         setEvents([]);
       }
       setError(null);
@@ -165,6 +168,7 @@ function App() {
 
   async function selectTicket(ticketId: number) {
     setAction(null);
+    setValidationReport(null);
     try {
       const detail = await getTicket(ticketId);
       const [history, currentTriage, currentImplementation, currentImplementationEvents] =
@@ -313,6 +317,21 @@ function App() {
       if (selected) await refreshTickets(selected.ticket.id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível coletar o relatório.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function loadValidationReport() {
+    const artifactId = implementation?.validation?.report.artifactId;
+    if (!implementation || !artifactId) return;
+    setAction("artifact");
+    setError(null);
+    try {
+      const result = await getImplementationArtifact(implementation.execution.id, artifactId);
+      setValidationReport(result.content);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível carregar o relatório.");
     } finally {
       setAction(null);
     }
@@ -1059,6 +1078,23 @@ function App() {
                         Teste: {implementation.validation.test.path} · Relatório:{" "}
                         {implementation.validation.report.relativePath}
                       </p>
+                      {implementation.validation.report.artifactId ? (
+                        <>
+                          <button
+                            className="mt-3 rounded-lg border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                            disabled={action !== null}
+                            onClick={() => void loadValidationReport()}
+                            type="button"
+                          >
+                            {action === "artifact" ? "Carregando..." : "Ver relatório"}
+                          </button>
+                          {validationReport ? (
+                            <pre className="mt-3 max-h-80 overflow-auto rounded-lg bg-ink p-4 text-xs whitespace-pre-wrap text-white">
+                              {validationReport}
+                            </pre>
+                          ) : null}
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   {implementation.delivery ? (

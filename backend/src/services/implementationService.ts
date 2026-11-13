@@ -297,6 +297,24 @@ export function createImplementationService(
       await assertInstanceOwned();
       return repository.applyDispatchObservation(input, state.context.checkpointFingerprint, run);
     },
+    async artifact(executionId: string, artifactId: string) {
+      if (!reports)
+        throw new DomainError(
+          "PRECONDITION_FAILED",
+          "Configure a leitura dos artefatos da pipeline.",
+        );
+      const { artifact, artifactRoot } = await repository.artifact(executionId, artifactId);
+      try {
+        const content = await reports.readArtifact(executionId, artifactRoot, {
+          relativePath: artifact.relativePath,
+          sha256: artifact.sha256,
+          sizeBytes: artifact.sizeBytes,
+        });
+        return { artifact, content: content.toString("utf8") };
+      } catch {
+        throw new DomainError("PRECONDITION_FAILED", "O artefato da execução está indisponível.");
+      }
+    },
     async start(input: StartImplementationInput) {
       await assertInstanceOwned();
       const current = await currentEnvironment();

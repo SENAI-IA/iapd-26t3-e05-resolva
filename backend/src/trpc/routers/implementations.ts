@@ -4,6 +4,8 @@ import {
   implementationListInputSchema,
   implementationListSchema,
   implementationDetailSchema,
+  implementationArtifactIdentitySchema,
+  implementationArtifactResultSchema,
   implementationCallbackResultSchema,
   implementationEventsInputSchema,
   implementationEventsSchema,
@@ -53,6 +55,10 @@ export const implementationsRouter = router({
     .input(implementationEventsInputSchema)
     .output(implementationEventsSchema)
     .query(({ ctx, input }) => ctx.implementations.events(input)),
+  artifact: implementationProcedure
+    .input(implementationArtifactIdentitySchema)
+    .output(implementationArtifactResultSchema)
+    .query(({ ctx, input }) => ctx.implementations.artifact(input.executionId, input.artifactId)),
   list: implementationProcedure
     .input(implementationListInputSchema.optional())
     .output(implementationListSchema)

@@ -12,7 +12,7 @@ export function createPipelineReportCollector(options: {
   secretValues?: readonly string[];
 }) {
   const stores = new Map<string, ReportStore>();
-  async function storeFor(context: Context) {
+  async function storeFor(context: Pick<Context, "artifactRoot">) {
     let path = await realpath(options.applicationRoot);
     for (const segment of triageSourcePathSchema.parse(context.artifactRoot).split("/")) {
       path = join(path, segment);
@@ -60,6 +60,13 @@ export function createPipelineReportCollector(options: {
       if (parsed.evidence.report.sha256 !== evidence.report.sha256)
         throw new Error("O relatório aprovado foi alterado.");
       return parsed;
+    },
+    async readArtifact(
+      executionId: string,
+      artifactRoot: string,
+      descriptor: ImplementationEvidence["report"],
+    ) {
+      return (await storeFor({ artifactRoot })).read(executionId, descriptor);
     },
   };
 }

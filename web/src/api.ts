@@ -7,6 +7,7 @@ import type {
   TicketList,
 } from "../../backend/src/domain/contracts.js";
 import type {
+  ImplementationArtifactResult,
   ImplementationCallbackResult,
   ImplementationDetail,
   ImplementationEvents,
@@ -118,6 +119,16 @@ export function getImplementationEvents(executionId: string): Promise<Implementa
     executionId,
     afterSequence: 0,
     limit: 100,
+  });
+}
+
+export function getImplementationArtifact(
+  executionId: string,
+  artifactId: string,
+): Promise<ImplementationArtifactResult> {
+  return call<ImplementationArtifactResult>("implementations.artifact", {
+    executionId,
+    artifactId,
   });
 }
 

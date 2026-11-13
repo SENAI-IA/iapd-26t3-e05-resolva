@@ -4,6 +4,7 @@ import {
   listTriagesSchema,
   type ListTriagesInput,
   type StartTriageInput,
+  type TriageEventsInput,
 } from "../domain/triageContracts.js";
 import type { TriageRepository } from "../repository/triageRepository.js";
 
@@ -53,6 +54,7 @@ export function createTriageService(
       return { triageExecutionId: id };
     },
     byId: repository.byId,
+    events: (input: TriageEventsInput) => repository.events(input),
     list: (input?: ListTriagesInput) => repository.list(input ?? listTriagesSchema.parse({})),
     async drain() {
       await Promise.all(jobs);

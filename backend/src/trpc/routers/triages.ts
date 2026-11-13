@@ -3,6 +3,8 @@ import {
   startTriageResultSchema,
   startTriageSchema,
   triageDetailSchema,
+  triageEventsInputSchema,
+  triageEventsSchema,
   triageIdentitySchema,
   triageListSchema,
 } from "../../domain/triageContracts.js";
@@ -17,6 +19,10 @@ export const triagesRouter = router({
     .input(triageIdentitySchema)
     .output(triageDetailSchema)
     .query(({ ctx, input }) => ctx.triages.byId(input.triageId)),
+  events: triageProcedure
+    .input(triageEventsInputSchema)
+    .output(triageEventsSchema)
+    .query(({ ctx, input }) => ctx.triages.events(input)),
   list: triageProcedure
     .input(listTriagesSchema.optional())
     .output(triageListSchema)

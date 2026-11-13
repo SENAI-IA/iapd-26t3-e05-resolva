@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import type { AppDatabase } from "../db/index.js";
 import { executionEvents, executions, ticketEvents, tickets, triages } from "../db/schema.js";
 import { DomainError } from "../domain/error.js";
@@ -9,6 +9,7 @@ import {
   triageReportSchema,
   type ListTriagesInput,
   type StartTriageInput,
+  type TriageEventsInput,
 } from "../domain/triageContracts.js";
 
 type Transaction = Parameters<Parameters<AppDatabase["db"]["transaction"]>[0]>[0];
@@ -366,6 +367,41 @@ export function createTriageRepository(database: AppDatabase) {
         .where(eq(triages.id, triageId));
       if (!row) throw new DomainError("NOT_FOUND", "Triagem não encontrada.");
       return toDetail(row);
+    },
+
+    async events(input: TriageEventsInput) {
+      const [triage] = await database.db
+        .select({ executionId: triages.executionId })
+        .from(triages)
+        .where(eq(triages.id, input.triageId))
+        .limit(1);
+      if (!triage) throw new DomainError("NOT_FOUND", "Triagem não encontrada.");
+      const rows = await database.db
+        .select()
+        .from(executionEvents)
+        .where(
+          and(
+            eq(executionEvents.executionId, triage.executionId),
+            gt(executionEvents.sequence, input.afterSequence),
+          ),
+        )
+        .orderBy(asc(executionEvents.sequence))
+        .limit(input.limit + 1);
+      const hasMore = rows.length > input.limit;
+      const items = rows.slice(0, input.limit).map((event) => ({
+        id: event.id,
+        sequence: event.sequence,
+        type: event.type,
+        stage: event.stage,
+        message: event.message,
+        payload: event.payload,
+        createdAt: event.createdAt.toISOString(),
+      }));
+      return {
+        items,
+        nextSequence: items.at(-1)?.sequence ?? input.afterSequence,
+        hasMore,
+      };
     },
 
     async list(input: ListTriagesInput) {

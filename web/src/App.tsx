@@ -13,7 +13,7 @@ import type {
   EnvironmentCheck,
   PublicEnvironment,
 } from "../../backend/src/domain/implementationContracts.js";
-import type { TriageDetail } from "../../backend/src/domain/triageContracts.js";
+import type { TriageDetail, TriageEvents } from "../../backend/src/domain/triageContracts.js";
 import {
   contestTriage,
   createTicket,
@@ -26,6 +26,7 @@ import {
   getTicket,
   getTicketEvents,
   getTriage,
+  getTriageEvents,
   listImplementationQueue,
   listImplementations,
   listTickets,
@@ -76,6 +77,8 @@ function App() {
   const [environmentCheck, setEnvironmentCheck] = useState<EnvironmentCheck | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [triage, setTriage] = useState<TriageDetail | null>(null);
+  const [triageEvents, setTriageEvents] = useState<TriageEvents["items"]>([]);
+  const [triageEventCursor, setTriageEventCursor] = useState(0);
   const [implementation, setImplementation] = useState<ImplementationDetail | null>(null);
   const [implementationEvents, setImplementationEvents] = useState<ImplementationEvents["items"]>(
     [],
@@ -126,11 +129,14 @@ function App() {
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
         const detail = await getTicket(nextId);
-        const [history, currentTriage, currentImplementation, currentImplementationEvents] =
+        const [history, currentTriage, currentTriageEvents, currentImplementation, currentImplementationEvents] =
           await Promise.all([
             getTicketEvents(nextId),
             detail.ticket.currentTriageId
               ? getTriage(detail.ticket.currentTriageId)
+              : Promise.resolve(null),
+            detail.ticket.currentTriageId
+              ? getTriageEvents(detail.ticket.currentTriageId)
               : Promise.resolve(null),
             detail.latestExecution?.kind === "implementation"
               ? getImplementation(detail.latestExecution.id)
@@ -142,12 +148,16 @@ function App() {
         setSelected(detail);
         setEvents(history.items);
         setTriage(currentTriage);
+        setTriageEvents(currentTriageEvents?.items ?? []);
+        setTriageEventCursor(currentTriageEvents?.nextSequence ?? 0);
         setImplementation(currentImplementation);
         setImplementationEvents(currentImplementationEvents?.items ?? []);
         setImplementationEventCursor(currentImplementationEvents?.nextSequence ?? 0);
       } else {
         setSelected(null);
         setTriage(null);
+        setTriageEvents([]);
+        setTriageEventCursor(0);
         setImplementation(null);
         setImplementationEvents([]);
         setImplementationEventCursor(0);
@@ -201,16 +211,43 @@ function App() {
     return () => window.clearInterval(timer);
   }, [implementation, implementationEventCursor]);
 
+  async function pollTriageEvents() {
+    if (!triage || triage.execution.status !== "em_andamento") return;
+    try {
+      const result = await getTriageEvents(triage.id, triageEventCursor);
+      if (result.items.length > 0) {
+        setTriageEvents((current) => {
+          const known = new Set(current.map((event) => event.id));
+          return [...current, ...result.items.filter((event) => !known.has(event.id))];
+        });
+      }
+      setTriageEventCursor(result.nextSequence);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível atualizar a triagem.");
+    }
+  }
+
+  useEffect(() => {
+    if (!triage || triage.execution.status !== "em_andamento") return;
+    const timer = window.setInterval(() => {
+      void pollTriageEvents();
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [triage, triageEventCursor]);
+
   async function selectTicket(ticketId: number) {
     setAction(null);
     setValidationReport(null);
     try {
       const detail = await getTicket(ticketId);
-      const [history, currentTriage, currentImplementation, currentImplementationEvents] =
+      const [history, currentTriage, currentTriageEvents, currentImplementation, currentImplementationEvents] =
         await Promise.all([
           getTicketEvents(ticketId),
           detail.ticket.currentTriageId
             ? getTriage(detail.ticket.currentTriageId)
+            : Promise.resolve(null),
+          detail.ticket.currentTriageId
+            ? getTriageEvents(detail.ticket.currentTriageId)
             : Promise.resolve(null),
           detail.latestExecution?.kind === "implementation"
             ? getImplementation(detail.latestExecution.id)
@@ -222,6 +259,8 @@ function App() {
       setSelected(detail);
       setEvents(history.items);
       setTriage(currentTriage);
+      setTriageEvents(currentTriageEvents?.items ?? []);
+      setTriageEventCursor(currentTriageEvents?.nextSequence ?? 0);
       setImplementation(currentImplementation);
       setImplementationEvents(currentImplementationEvents?.items ?? []);
       setImplementationEventCursor(currentImplementationEvents?.nextSequence ?? 0);
@@ -1017,6 +1056,28 @@ function App() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    {triageEvents.length > 0 ? (
+                      <div className="mt-5 border-t border-line pt-4">
+                        <h4 className="text-sm font-semibold">Eventos da triagem</h4>
+                        <ol className="mt-3 space-y-3">
+                          {triageEvents.map((event) => (
+                            <li className="border-l-2 border-line pl-4" key={event.id}>
+                              <div className="flex flex-wrap justify-between gap-2 text-xs text-muted">
+                                <span className="font-semibold">
+                                  #{event.sequence} · {event.type}
+                                </span>
+                                <time dateTime={event.createdAt}>
+                                  {new Date(event.createdAt).toLocaleString("pt-BR")}
+                                </time>
+                              </div>
+                              <p className="mt-1 text-sm text-muted">{event.message}</p>
+                              {event.stage ? (
+                                <p className="mt-1 text-xs text-muted">Etapa: {event.stage}</p>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ol>
                       </div>
                     ) : null}
                   </section>

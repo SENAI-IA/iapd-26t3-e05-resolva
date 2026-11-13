@@ -15,6 +15,28 @@ export const startTriageSchema = ticketVersionSchema.extend({ requestKey: z.uuid
 export type StartTriageInput = z.infer<typeof startTriageSchema>;
 export const startTriageResultSchema = z.strictObject({ triageExecutionId: z.uuid() });
 export const triageIdentitySchema = z.strictObject({ triageId: z.uuid() });
+export const triageEventsInputSchema = triageIdentitySchema.extend({
+  afterSequence: z.number().int().nonnegative().default(0),
+  limit: z.number().int().min(1).max(200).default(100),
+});
+export const triageEventsSchema = z.strictObject({
+  items: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      sequence: z.number().int().positive(),
+      type: z.string().min(1),
+      stage: z.string().nullable(),
+      message: z.string().min(1),
+      payload: z.record(z.string(), z.json()),
+      createdAt: z.iso.datetime(),
+    }),
+  ),
+  nextSequence: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+});
+export type TriageEventsInput = z.infer<typeof triageEventsInputSchema>;
+export type TriageEvents = z.infer<typeof triageEventsSchema>;
+
 export const listTriagesSchema = paginationSchema.extend({
   ticketId: ticketIdentitySchema.shape.ticketId.optional(),
   classification: classificationSchema.optional(),

@@ -18,7 +18,7 @@ import type {
   StartImplementationResult,
 } from "../../backend/src/domain/implementationContracts.js";
 import type { DispatchReconciliationResult } from "../../backend/src/domain/implementationDispatch.js";
-import type { StartTriageInput, TriageDetail } from "../../backend/src/domain/triageContracts.js";
+import type { StartTriageInput, TriageDetail, TriageEvents } from "../../backend/src/domain/triageContracts.js";
 
 type ApiResponse<T> = {
   result?: { data?: T };
@@ -58,6 +58,14 @@ export function getTicketEvents(ticketId: number): Promise<TicketEvents> {
 
 export function getTriage(triageId: string): Promise<TriageDetail> {
   return call<TriageDetail>("triages.byId", { triageId });
+}
+
+export function getTriageEvents(triageId: string, afterSequence = 0): Promise<TriageEvents> {
+  return call<TriageEvents>("triages.events", {
+    triageId,
+    afterSequence,
+    limit: 100,
+  });
 }
 
 export function createTicket(input: TicketContent): Promise<Ticket> {

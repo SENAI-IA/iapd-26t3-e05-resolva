@@ -13,7 +13,11 @@ import type {
   EnvironmentCheck,
   PublicEnvironment,
 } from "../../backend/src/domain/implementationContracts.js";
-import type { TriageDetail, TriageEvents } from "../../backend/src/domain/triageContracts.js";
+import type {
+  TriageDetail,
+  TriageEvents,
+  TriageListResult,
+} from "../../backend/src/domain/triageContracts.js";
 import {
   contestTriage,
   createTicket,
@@ -30,6 +34,7 @@ import {
   listImplementationQueue,
   listImplementations,
   listTickets,
+  listTriages,
   provideTicketInformation,
   reconcileDispatch,
   requestTicketChanges,
@@ -86,6 +91,7 @@ function App() {
   const [environmentCheck, setEnvironmentCheck] = useState<EnvironmentCheck | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [triage, setTriage] = useState<TriageDetail | null>(null);
+  const [triageHistory, setTriageHistory] = useState<TriageListResult["items"]>([]);
   const [triageEvents, setTriageEvents] = useState<TriageEvents["items"]>([]);
   const [triageEventCursor, setTriageEventCursor] = useState(0);
   const [implementation, setImplementation] = useState<ImplementationDetail | null>(null);
@@ -153,7 +159,7 @@ function App() {
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
         const detail = await getTicket(nextId);
-        const [history, currentTriage, currentTriageEvents, currentImplementation, currentImplementationEvents] =
+        const [history, currentTriage, currentTriageEvents, currentTriageHistory, currentImplementation, currentImplementationEvents] =
           await Promise.all([
             getTicketEvents(nextId),
             detail.ticket.currentTriageId
@@ -162,6 +168,7 @@ function App() {
             detail.ticket.currentTriageId
               ? getTriageEvents(detail.ticket.currentTriageId)
               : Promise.resolve(null),
+            listTriages(nextId),
             detail.latestExecution?.kind === "implementation"
               ? getImplementation(detail.latestExecution.id)
               : Promise.resolve(null),
@@ -172,6 +179,7 @@ function App() {
         setSelected(detail);
         setEvents(history.items);
         setTriage(currentTriage);
+        setTriageHistory(currentTriageHistory.items);
         setTriageEvents(currentTriageEvents?.items ?? []);
         setTriageEventCursor(currentTriageEvents?.nextSequence ?? 0);
         setImplementation(currentImplementation);
@@ -180,6 +188,7 @@ function App() {
       } else {
         setSelected(null);
         setTriage(null);
+        setTriageHistory([]);
         setTriageEvents([]);
         setTriageEventCursor(0);
         setImplementation(null);
@@ -276,7 +285,7 @@ function App() {
     setValidationReport(null);
     try {
       const detail = await getTicket(ticketId);
-      const [history, currentTriage, currentTriageEvents, currentImplementation, currentImplementationEvents] =
+      const [history, currentTriage, currentTriageEvents, currentTriageHistory, currentImplementation, currentImplementationEvents] =
         await Promise.all([
           getTicketEvents(ticketId),
           detail.ticket.currentTriageId
@@ -285,6 +294,7 @@ function App() {
           detail.ticket.currentTriageId
             ? getTriageEvents(detail.ticket.currentTriageId)
             : Promise.resolve(null),
+          listTriages(ticketId),
           detail.latestExecution?.kind === "implementation"
             ? getImplementation(detail.latestExecution.id)
             : Promise.resolve(null),
@@ -295,6 +305,7 @@ function App() {
       setSelected(detail);
       setEvents(history.items);
       setTriage(currentTriage);
+      setTriageHistory(currentTriageHistory.items);
       setTriageEvents(currentTriageEvents?.items ?? []);
       setTriageEventCursor(currentTriageEvents?.nextSequence ?? 0);
       setImplementation(currentImplementation);
@@ -1249,6 +1260,32 @@ function App() {
                           ))}
                         </ol>
                       </div>
+                    ) : null}
+                    {triageHistory.length > 1 ? (
+                      <details className="mt-5 border-t border-line pt-4">
+                        <summary className="cursor-pointer text-sm font-semibold">
+                          Histórico de triagens ({triageHistory.length})
+                        </summary>
+                        <ol className="mt-3 space-y-2">
+                          {triageHistory.map((item) => (
+                            <li className="rounded-lg bg-surface p-3 text-sm" key={item.id}>
+                              <div className="flex flex-wrap justify-between gap-2">
+                                <span className="font-semibold">
+                                  v{item.ticketVersion} · {item.classification}
+                                </span>
+                                <span className="text-muted">
+                                  {item.status === "valid"
+                                    ? "Vigente"
+                                    : item.status === "invalidated"
+                                      ? "Desatualizada"
+                                      : "Substituída"}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-muted">{item.summary}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
                     ) : null}
                   </section>
                   {canProvideInformation || canContest ? (

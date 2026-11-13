@@ -104,3 +104,4 @@ export const triageListSchema = z.strictObject({
   items: z.array(triageDetailSchema),
   total: z.number().int().nonnegative(),
 });
+export type TriageListResult = z.infer<typeof triageListSchema>;

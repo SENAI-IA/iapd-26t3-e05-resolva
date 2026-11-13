@@ -83,11 +83,15 @@ export const implementationExecutionSchema = z.strictObject({
   triageId: z.uuid().nullable(),
   deliveryId: z.uuid().nullable(),
   validatedSha: z.string().nullable(),
+  publishedSha: z.string().nullable(),
   status: executionStatusSchema,
   stage: z.string().nullable(),
   mode: executionModeSchema.nullable(),
   round: z.number().int().nonnegative().max(3),
   outcome: z.string().nullable(),
+  diagnosis: z.string().nullable(),
+  blockerCode: z.string().nullable(),
+  blockerMessage: z.string().nullable(),
   workflowId: z.string().nullable(),
   workflowUrl: z.url().nullable(),
   startedAt: isoDate,
@@ -112,6 +116,27 @@ export type ImplementationListInput = z.infer<typeof implementationListInputSche
 export type ImplementationListResult = z.infer<typeof implementationListSchema>;
 
 export const implementationIdentitySchema = z.strictObject({ executionId: z.uuid() });
+
+const executionEventSchema = z.strictObject({
+  id: z.uuid(),
+  sequence: z.number().int().positive(),
+  type: z.string().min(1),
+  stage: z.string().nullable(),
+  message: z.string().min(1),
+  payload: z.record(z.string(), z.json()),
+  createdAt: isoDate,
+});
+export const implementationEventsInputSchema = implementationIdentitySchema.extend({
+  afterSequence: z.number().int().nonnegative().default(0),
+  limit: z.number().int().min(1).max(200).default(100),
+});
+export type ImplementationEventsInput = z.infer<typeof implementationEventsInputSchema>;
+export const implementationEventsSchema = z.strictObject({
+  items: z.array(executionEventSchema),
+  nextSequence: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+});
+export type ImplementationEvents = z.infer<typeof implementationEventsSchema>;
 
 export const implementationTriageSchema = z.strictObject({
   id: z.uuid(),

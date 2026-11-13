@@ -5,6 +5,8 @@ import {
   implementationListSchema,
   implementationDetailSchema,
   implementationCallbackResultSchema,
+  implementationEventsInputSchema,
+  implementationEventsSchema,
   implementationQueueInputSchema,
   implementationQueueResultSchema,
   publicEnvironmentSchema,
@@ -47,6 +49,10 @@ export const implementationsRouter = router({
     .input(dispatchReconciliationInputSchema)
     .output(dispatchReconciliationResultSchema)
     .mutation(({ ctx, input }) => ctx.implementations.reconcileDispatch(input)),
+  events: implementationProcedure
+    .input(implementationEventsInputSchema)
+    .output(implementationEventsSchema)
+    .query(({ ctx, input }) => ctx.implementations.events(input)),
   list: implementationProcedure
     .input(implementationListInputSchema.optional())
     .output(implementationListSchema)

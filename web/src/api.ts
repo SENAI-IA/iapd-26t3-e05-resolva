@@ -9,6 +9,7 @@ import type {
 import type {
   ImplementationCallbackResult,
   ImplementationDetail,
+  ImplementationEvents,
   ImplementationListResult,
   ImplementationQueueResult,
   PublicEnvironment,
@@ -110,6 +111,14 @@ export function startTriage(input: StartTriageInput): Promise<StartTriageResult>
 
 export function getImplementation(executionId: string): Promise<ImplementationDetail> {
   return call<ImplementationDetail>("implementations.byId", { executionId });
+}
+
+export function getImplementationEvents(executionId: string): Promise<ImplementationEvents> {
+  return call<ImplementationEvents>("implementations.events", {
+    executionId,
+    afterSequence: 0,
+    limit: 100,
+  });
 }
 
 export function reconcileDispatch(input: {

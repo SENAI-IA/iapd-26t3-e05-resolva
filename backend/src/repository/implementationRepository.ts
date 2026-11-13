@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, max, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, max, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { githubRepositorySchema, githubBranchSchema } from "../integrations/github/contracts.js";
 import type { AppDatabase } from "../db/index.js";
@@ -21,6 +21,7 @@ import {
 import {
   implementationDetailSchema,
   implementationExecutionSchema,
+  type ImplementationEventsInput,
   type ImplementationListInput,
   type ImplementationListResult,
   type ImplementationQueueInput,
@@ -119,11 +120,15 @@ function executionDetails(execution: typeof executions.$inferSelect) {
     triageId: execution.triageId,
     deliveryId: execution.deliveryId,
     validatedSha: execution.validatedSha,
+    publishedSha: execution.publishedSha,
     status: execution.status,
     stage: execution.stage,
     mode: execution.mode,
     round: execution.round,
     outcome: execution.outcome,
+    diagnosis: execution.diagnosis,
+    blockerCode: execution.blockerCode,
+    blockerMessage: execution.blockerMessage,
     workflowId: execution.workflowId,
     workflowUrl: execution.workflowUrl,
     startedAt: execution.startedAt.toISOString(),
@@ -239,6 +244,42 @@ export function createImplementationRepository(database: AppDatabase) {
         },
         { isolationLevel: "repeatable read", accessMode: "read only" },
       );
+    },
+
+    async events(input: ImplementationEventsInput) {
+      const [execution] = await database.db
+        .select({ id: executions.id })
+        .from(executions)
+        .where(and(eq(executions.id, input.executionId), eq(executions.kind, "implementation")))
+        .limit(1);
+      if (!execution)
+        throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+      const rows = await database.db
+        .select()
+        .from(executionEvents)
+        .where(
+          and(
+            eq(executionEvents.executionId, input.executionId),
+            gt(executionEvents.sequence, input.afterSequence),
+          ),
+        )
+        .orderBy(asc(executionEvents.sequence))
+        .limit(input.limit + 1);
+      const hasMore = rows.length > input.limit;
+      const items = rows.slice(0, input.limit).map((event) => ({
+        id: event.id,
+        sequence: event.sequence,
+        type: event.type,
+        stage: event.stage,
+        message: event.message,
+        payload: event.payload,
+        createdAt: event.createdAt.toISOString(),
+      }));
+      return {
+        items,
+        nextSequence: items.at(-1)?.sequence ?? input.afterSequence,
+        hasMore,
+      };
     },
 
     async byId(executionId: string) {

@@ -7,6 +7,7 @@ import type {
 } from "../../backend/src/domain/contracts.js";
 import type {
   ImplementationDetail,
+  ImplementationEvents,
   ImplementationListResult,
   ImplementationQueueResult,
   PublicEnvironment,
@@ -18,6 +19,7 @@ import {
   collectImplementationReport,
   getImplementation,
   getImplementationEnvironment,
+  getImplementationEvents,
   getTicket,
   getTicketEvents,
   getTriage,
@@ -46,6 +48,12 @@ const statusLabels: Record<Ticket["status"], string> = {
   resolvido: "Resolvido",
 };
 
+const triageStatusLabels: Record<TriageDetail["status"], string> = {
+  valid: "Vigente",
+  invalidated: "Desatualizada",
+  superseded: "Substituída",
+};
+
 const emptyForm: TicketContent = {
   targetSystemKey: "demo",
   title: "",
@@ -64,6 +72,9 @@ function App() {
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [triage, setTriage] = useState<TriageDetail | null>(null);
   const [implementation, setImplementation] = useState<ImplementationDetail | null>(null);
+  const [implementationEvents, setImplementationEvents] = useState<ImplementationEvents["items"]>(
+    [],
+  );
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
@@ -107,23 +118,29 @@ function App() {
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
         const detail = await getTicket(nextId);
-        const [history, currentTriage, currentImplementation] = await Promise.all([
-          getTicketEvents(nextId),
-          detail.ticket.currentTriageId
-            ? getTriage(detail.ticket.currentTriageId)
-            : Promise.resolve(null),
-          detail.latestExecution?.kind === "implementation"
-            ? getImplementation(detail.latestExecution.id)
-            : Promise.resolve(null),
-        ]);
+        const [history, currentTriage, currentImplementation, currentImplementationEvents] =
+          await Promise.all([
+            getTicketEvents(nextId),
+            detail.ticket.currentTriageId
+              ? getTriage(detail.ticket.currentTriageId)
+              : Promise.resolve(null),
+            detail.latestExecution?.kind === "implementation"
+              ? getImplementation(detail.latestExecution.id)
+              : Promise.resolve(null),
+            detail.latestExecution?.kind === "implementation"
+              ? getImplementationEvents(detail.latestExecution.id)
+              : Promise.resolve(null),
+          ]);
         setSelected(detail);
         setEvents(history.items);
         setTriage(currentTriage);
         setImplementation(currentImplementation);
+        setImplementationEvents(currentImplementationEvents?.items ?? []);
       } else {
         setSelected(null);
         setTriage(null);
         setImplementation(null);
+        setImplementationEvents([]);
         setEvents([]);
       }
       setError(null);
@@ -150,19 +167,24 @@ function App() {
     setAction(null);
     try {
       const detail = await getTicket(ticketId);
-      const [history, currentTriage, currentImplementation] = await Promise.all([
-        getTicketEvents(ticketId),
-        detail.ticket.currentTriageId
-          ? getTriage(detail.ticket.currentTriageId)
-          : Promise.resolve(null),
-        detail.latestExecution?.kind === "implementation"
-          ? getImplementation(detail.latestExecution.id)
-          : Promise.resolve(null),
-      ]);
+      const [history, currentTriage, currentImplementation, currentImplementationEvents] =
+        await Promise.all([
+          getTicketEvents(ticketId),
+          detail.ticket.currentTriageId
+            ? getTriage(detail.ticket.currentTriageId)
+            : Promise.resolve(null),
+          detail.latestExecution?.kind === "implementation"
+            ? getImplementation(detail.latestExecution.id)
+            : Promise.resolve(null),
+          detail.latestExecution?.kind === "implementation"
+            ? getImplementationEvents(detail.latestExecution.id)
+            : Promise.resolve(null),
+        ]);
       setSelected(detail);
       setEvents(history.items);
       setTriage(currentTriage);
       setImplementation(currentImplementation);
+      setImplementationEvents(currentImplementationEvents?.items ?? []);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o ticket.");
@@ -377,7 +399,8 @@ function App() {
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
   const canEdit =
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
-  const canImplement = selected?.ticket.status === "aguardando_implementacao";
+  const canImplement =
+    selected?.ticket.status === "aguardando_implementacao" && triage?.status === "valid";
   const configuredCategories = environment?.targetSystem?.categories ?? [];
 
   return (
@@ -770,9 +793,16 @@ function App() {
                   <section className="mt-8 rounded-lg bg-canvas p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h3 className="font-semibold">Resultado da triagem</h3>
-                      <span className="rounded-full bg-surface px-3 py-1 text-sm font-semibold">
-                        {triage.classification}
-                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-surface px-3 py-1 text-sm font-semibold">
+                          {triage.classification}
+                        </span>
+                        <span
+                          className={`rounded-full px-3 py-1 text-sm font-semibold ${triage.status === "valid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}
+                        >
+                          Triagem {triageStatusLabels[triage.status]}
+                        </span>
+                      </div>
                     </div>
                     <div className="mt-5 grid gap-5 md:grid-cols-2">
                       <div>
@@ -800,6 +830,16 @@ function App() {
                         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
                           {triage.questions.map((question) => (
                             <li key={question}>{question}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {triage.uncertainties.length > 0 ? (
+                      <div className="mt-5">
+                        <h4 className="text-sm font-semibold">Incertezas e limitações</h4>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
+                          {triage.uncertainties.map((uncertainty) => (
+                            <li key={uncertainty}>{uncertainty}</li>
                           ))}
                         </ul>
                       </div>
@@ -969,7 +1009,32 @@ function App() {
                         {implementation.execution.validatedSha ?? "Pendente"}
                       </dd>
                     </div>
+                    <div>
+                      <dt className="text-muted">SHA publicado</dt>
+                      <dd className="mt-1 break-all font-semibold">
+                        {implementation.execution.publishedSha ?? "Pendente"}
+                      </dd>
+                    </div>
                   </dl>
+                  {implementation.execution.diagnosis ? (
+                    <div className="mt-4 border-t border-line pt-4">
+                      <h4 className="text-sm font-semibold">Diagnóstico</h4>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-muted">
+                        {implementation.execution.diagnosis}
+                      </p>
+                    </div>
+                  ) : null}
+                  {implementation.execution.blockerMessage ? (
+                    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                      <strong>
+                        Impedimento
+                        {implementation.execution.blockerCode
+                          ? ` · ${implementation.execution.blockerCode}`
+                          : ""}
+                      </strong>
+                      <p className="mt-1">{implementation.execution.blockerMessage}</p>
+                    </div>
+                  ) : null}
                   {implementation.execution.outcome ? (
                     <p className="mt-4 text-sm text-muted">{implementation.execution.outcome}</p>
                   ) : null}
@@ -980,6 +1045,29 @@ function App() {
                       {implementation.delivery.prState
                         ? ` · PR ${implementation.delivery.prState}`
                         : " · PR pendente"}
+                    </div>
+                  ) : null}
+                  {implementationEvents.length > 0 ? (
+                    <div className="mt-4 border-t border-line pt-4">
+                      <h4 className="text-sm font-semibold">Eventos da execução</h4>
+                      <ol className="mt-3 space-y-3">
+                        {implementationEvents.map((event) => (
+                          <li className="border-l-2 border-line pl-4" key={event.id}>
+                            <div className="flex flex-wrap justify-between gap-2 text-xs text-muted">
+                              <span className="font-semibold">
+                                #{event.sequence} · {event.type}
+                              </span>
+                              <time dateTime={event.createdAt}>
+                                {new Date(event.createdAt).toLocaleString("pt-BR")}
+                              </time>
+                            </div>
+                            <p className="mt-1 text-sm text-muted">{event.message}</p>
+                            {event.stage ? (
+                              <p className="mt-1 text-xs text-muted">Etapa: {event.stage}</p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ol>
                     </div>
                   ) : null}
                 </section>

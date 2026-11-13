@@ -7,6 +7,7 @@ import type { ImplementationEnvironment } from "../domain/contracts.js";
 import {
   implementationListInputSchema,
   implementationQueueInputSchema,
+  type ImplementationEventsInput,
   type ImplementationListInput,
   type ImplementationQueueInput,
   type StartImplementationInput,
@@ -205,6 +206,9 @@ export function createImplementationService(
     },
     list(input?: ImplementationListInput) {
       return repository.list(input ?? implementationListInputSchema.parse({}));
+    },
+    events(input: ImplementationEventsInput) {
+      return repository.events(input);
     },
     byId(executionId: string) {
       return repository.byId(executionId);

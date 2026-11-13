@@ -1261,6 +1261,7 @@ function App() {
                           ))}
                         </ul>
                       </div>
+                    ) : null}
                     {triageEvents.length > 0 ? (
                       <div className="mt-5 border-t border-line pt-4">
                         <h4 className="text-sm font-semibold">Eventos da triagem</h4>

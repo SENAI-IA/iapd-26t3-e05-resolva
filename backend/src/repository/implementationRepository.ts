@@ -746,6 +746,7 @@ export function createImplementationRepository(database: AppDatabase) {
           },
         };
       });
+    },
     async retry(input: RetryImplementationInput, environment: RuntimeEnvironment) {
       return database.db.transaction(async (tx) => {
         const [existing] = await tx
@@ -874,6 +875,7 @@ export function createImplementationRepository(database: AppDatabase) {
       });
     },
   };
+}
 
 export type ImplementationRepository = ReturnType<typeof createImplementationRepository>;
 export type ImplementationReservation = NonNullable<

@@ -635,6 +635,20 @@ export function createImplementationRepository(database: AppDatabase) {
           classification: ticket.classification,
           triage: triageSnapshot,
         };
+        const [lastChange] = await tx
+          .select({ payload: ticketEvents.payload })
+          .from(ticketEvents)
+          .where(
+            and(eq(ticketEvents.ticketId, ticket.id), eq(ticketEvents.type, "changes_requested")),
+          )
+          .orderBy(desc(ticketEvents.createdAt), desc(ticketEvents.id))
+          .limit(1);
+        const mode =
+          lastChange?.payload.kind === "refinement"
+            ? "review_refinement"
+            : lastChange?.payload.kind === "behavior"
+              ? "review_behavior"
+              : "initial";
         const [created] = await tx
           .insert(executions)
           .values({
@@ -643,7 +657,7 @@ export function createImplementationRepository(database: AppDatabase) {
             kind: "implementation",
             triageId: triage?.id,
             requestKey: input.requestKey,
-            mode: "initial",
+            mode,
             stage: "preparando_ambiente",
             ticketSnapshot,
             configSnapshot: ticket.targetConfigSnapshot,
@@ -703,6 +717,7 @@ export function createImplementationRepository(database: AppDatabase) {
           payload: {
             executionId: created.id,
             triageId: triage?.id ?? null,
+            mode,
             version: ticket.version,
           },
           createdAt: sql`clock_timestamp()`,

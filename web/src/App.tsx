@@ -77,6 +77,11 @@ function App() {
   const [queueSearch, setQueueSearch] = useState("");
   const [queueClassification, setQueueClassification] = useState<"bug" | "melhoria" | "">("");
   const [executions, setExecutions] = useState<ImplementationListResult["items"]>([]);
+  const [executionTotal, setExecutionTotal] = useState(0);
+  const [executionPage, setExecutionPage] = useState(1);
+  const [executionStatus, setExecutionStatus] = useState<
+    "" | "em_andamento" | "bloqueada" | "falhou" | "concluida" | "interrompida"
+  >("" );
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [environmentCheck, setEnvironmentCheck] = useState<EnvironmentCheck | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
@@ -94,6 +99,7 @@ function App() {
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<Ticket["status"] | "">("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -116,6 +122,7 @@ function App() {
         pageSize: 15,
         ...(search.trim() ? { q: search.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
+        ...(categoryFilter ? { category: categoryFilter } : {}),
       };
       const [result, implementationQueue, implementationList, implementationEnvironment] =
         await Promise.all([
@@ -126,7 +133,11 @@ function App() {
             ...(queueSearch.trim() ? { q: queueSearch.trim() } : {}),
             ...(queueClassification ? { classification: queueClassification } : {}),
           }),
-          listImplementations(),
+          listImplementations({
+            page: executionPage,
+            pageSize: 10,
+            ...(executionStatus ? { status: executionStatus } : {}),
+          }),
           getImplementationEnvironment(),
         ]);
       setTickets(result.items);
@@ -136,6 +147,8 @@ function App() {
       setQueueTotal(implementationQueue.total);
       setQueuePage(implementationQueue.page);
       setExecutions(implementationList.items);
+      setExecutionTotal(implementationList.total);
+      setExecutionPage(implementationList.page);
       setEnvironment(implementationEnvironment);
       const nextId = selectedId ?? result.items[0]?.id;
       if (nextId !== undefined) {
@@ -212,7 +225,19 @@ function App() {
       void refreshTickets(selected?.ticket.id);
     }, 10_000);
     return () => window.clearInterval(timer);
-  }, [executions, page, queueClassification, queuePage, queueSearch, search, selected?.ticket.id, statusFilter]);
+  }, [
+    categoryFilter,
+    executionPage,
+    executionStatus,
+    executions,
+    page,
+    queueClassification,
+    queuePage,
+    queueSearch,
+    search,
+    selected?.ticket.id,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     if (!implementation || implementation.execution.status !== "em_andamento") return;
@@ -604,6 +629,18 @@ function App() {
                   </option>
                 ))}
               </select>
+              <select
+                className="field mt-0"
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                value={categoryFilter}
+              >
+                <option value="">Todas as categorias</option>
+                {configuredCategories.map((category) => (
+                  <option key={category.slug} value={category.slug}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
               <button
                 className="rounded-lg border border-line px-3 text-sm font-semibold"
                 type="submit"
@@ -813,6 +850,35 @@ function App() {
                 <span className="text-xs text-muted">Atualização automática</span>
               ) : null}
             </div>
+            <form
+              className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void refreshTickets(selected?.ticket.id);
+              }}
+            >
+              <select
+                className="field mt-0"
+                onChange={(event) => {
+                  setExecutionStatus(event.target.value as typeof executionStatus);
+                  setExecutionPage(1);
+                }}
+                value={executionStatus}
+              >
+                <option value="">Todos os estados</option>
+                <option value="em_andamento">Em andamento</option>
+                <option value="bloqueada">Bloqueada</option>
+                <option value="falhou">Falhou</option>
+                <option value="concluida">Concluída</option>
+                <option value="interrompida">Interrompida</option>
+              </select>
+              <button
+                className="rounded-lg border border-line px-3 text-sm font-semibold"
+                type="submit"
+              >
+                Filtrar
+              </button>
+            </form>
             {executions.length === 0 ? (
               <p className="mt-3 text-sm text-muted">Nenhuma execução registrada.</p>
             ) : (
@@ -835,6 +901,35 @@ function App() {
                 ))}
               </div>
             )}
+            <div className="mt-4 flex items-center justify-between text-xs text-muted">
+              <span>
+                Página {executionPage} · {executionTotal} execução{executionTotal === 1 ? "" : "ões"}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="rounded border border-line px-2 py-1 disabled:opacity-40"
+                  disabled={executionPage === 1 || loading}
+                  onClick={() => {
+                    setExecutionPage(executionPage - 1);
+                    void refreshTickets(selected?.ticket.id);
+                  }}
+                  type="button"
+                >
+                  Anterior
+                </button>
+                <button
+                  className="rounded border border-line px-2 py-1 disabled:opacity-40"
+                  disabled={executionPage * 10 >= executionTotal || loading}
+                  onClick={() => {
+                    setExecutionPage(executionPage + 1);
+                    void refreshTickets(selected?.ticket.id);
+                  }}
+                  type="button"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 

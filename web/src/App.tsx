@@ -170,7 +170,11 @@ function App() {
 
   function startNewTicket() {
     setEditingTicketId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      targetSystemKey: environment?.targetSystem?.targetSystemKey ?? emptyForm.targetSystemKey,
+      category: environment?.targetSystem?.categories[0]?.slug ?? emptyForm.category,
+    });
     setNotice(null);
     setShowForm(true);
   }
@@ -358,6 +362,7 @@ function App() {
   const canEdit =
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
   const canImplement = selected?.ticket.status === "aguardando_implementacao";
+  const configuredCategories = environment?.targetSystem?.categories ?? [];
 
   return (
     <main className="min-h-screen bg-canvas">
@@ -502,6 +507,21 @@ function App() {
           </div>
           <div className="mt-8 border-t border-line pt-5">
             <div className="flex items-baseline justify-between gap-3">
+              <h3 className="font-semibold">Ambiente de execução</h3>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${environment?.ready ? "bg-emerald-50 text-emerald-700" : "bg-canvas text-muted"}`}
+              >
+                {environment?.ready ? "Disponível" : "Pendente"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-muted">
+              {environment?.ready
+                ? `${environment.sourceCount} fonte${environment.sourceCount === 1 ? "" : "s"} autorizada${environment.sourceCount === 1 ? "" : "s"} para análise.`
+                : "Configure as fontes autorizadas para habilitar as execuções."}
+            </p>
+          </div>
+          <div className="mt-8 border-t border-line pt-5">
+            <div className="flex items-baseline justify-between gap-3">
               <h3 className="font-semibold">Execuções recentes ({executions.length})</h3>
               {executions.some(({ execution }) => execution.status === "em_andamento") ? (
                 <span className="text-xs text-muted">Atualização automática</span>
@@ -574,19 +594,40 @@ function App() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold">
                   Sistema-alvo
-                  <input
-                    className="field"
-                    onChange={(event) => setForm({ ...form, targetSystemKey: event.target.value })}
-                    value={form.targetSystemKey}
-                  />
+                  {environment?.targetSystem ? (
+                    <select
+                      className="field"
+                      disabled
+                      onChange={(event) =>
+                        setForm({ ...form, targetSystemKey: event.target.value })
+                      }
+                      value={form.targetSystemKey}
+                    >
+                      <option value={environment.targetSystem.targetSystemKey}>
+                        {environment.targetSystem.displayName}
+                      </option>
+                    </select>
+                  ) : (
+                    <input className="field" disabled value="Nenhum sistema configurado" />
+                  )}
                 </label>
                 <label className="text-sm font-semibold">
                   Categoria
-                  <input
-                    className="field"
-                    onChange={(event) => setForm({ ...form, category: event.target.value })}
-                    value={form.category}
-                  />
+                  {configuredCategories.length > 0 ? (
+                    <select
+                      className="field"
+                      onChange={(event) => setForm({ ...form, category: event.target.value })}
+                      value={form.category}
+                    >
+                      {configuredCategories.map((category) => (
+                        <option key={category.slug} value={category.slug}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className="field" disabled value="Nenhuma categoria disponível" />
+                  )}
                 </label>
                 <label className="text-sm font-semibold sm:col-span-2">
                   Título

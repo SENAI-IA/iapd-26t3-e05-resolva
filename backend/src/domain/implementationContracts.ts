@@ -3,13 +3,31 @@ import {
   classificationSchema,
   eligibilityResultSchema,
   paginationSchema,
+  targetSystemKeySchema,
   ticketIdentitySchema,
   ticketSchema,
 } from "./contracts.js";
 
+export const publicTargetSystemSchema = z.strictObject({
+  targetSystemKey: targetSystemKeySchema,
+  displayName: z.string().min(1),
+  version: z.number().int().positive(),
+  repository: z.string().min(1),
+  baseBranch: z.string().min(1),
+  workflowRef: z.string().min(1),
+  categories: z.array(
+    z.strictObject({
+      slug: z.string().min(1),
+      label: z.string().min(1),
+    }),
+  ),
+});
+export type PublicTargetSystem = z.infer<typeof publicTargetSystemSchema>;
+
 export const publicEnvironmentSchema = z.strictObject({
   ready: z.boolean(),
   sourceCount: z.number().int().nonnegative(),
+  targetSystem: publicTargetSystemSchema.nullable(),
 });
 export type PublicEnvironment = z.infer<typeof publicEnvironmentSchema>;
 

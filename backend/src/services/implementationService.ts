@@ -20,6 +20,7 @@ import {
 import type { InstanceGuard } from "../executor/instanceGuard.js";
 import type { PipelineReportCollector } from "../integrations/ci/collectReport.js";
 import type { ParsedPipelineReport } from "../integrations/ci/report.js";
+import type { PublicTargetSystem } from "../domain/implementationContracts.js";
 
 const workflowConfigSchema = z.object({
   repository: z.string().min(1),
@@ -27,7 +28,9 @@ const workflowConfigSchema = z.object({
   baseBranch: z.string().min(1),
 });
 
-type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes">;
+type RuntimeEnvironment = Pick<ImplementationEnvironment, "ready" | "sourceHashes"> & {
+  targetSystem?: PublicTargetSystem | null;
+};
 type RuntimeEnvironmentProvider =
   | RuntimeEnvironment
   | (() => RuntimeEnvironment | Promise<RuntimeEnvironment>);
@@ -193,6 +196,7 @@ export function createImplementationService(
       return {
         ready: current.ready,
         sourceCount: Object.keys(current.sourceHashes).length,
+        targetSystem: current.targetSystem ?? null,
       };
     },
     async queue(input?: ImplementationQueueInput) {

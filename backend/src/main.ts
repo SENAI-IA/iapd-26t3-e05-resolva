@@ -93,7 +93,18 @@ try {
         })
       : undefined;
   const readImplementationEnvironment = async () => {
-    if (!targetConfig) return { ready: false, sourceHashes: {} };
+    const targetSystem = targetConfig
+      ? {
+          targetSystemKey: targetConfig.targetSystemKey,
+          displayName: targetConfig.displayName,
+          version: targetConfig.version,
+          repository: targetConfig.repository,
+          baseBranch: targetConfig.baseBranch,
+          workflowRef: targetConfig.workflowRef,
+          categories: targetConfig.categories,
+        }
+      : null;
+    if (!targetConfig) return { ready: false, sourceHashes: {}, targetSystem };
     try {
       const sources = await collectAuthorizedSources(
         resolve(root, targetConfig.repositoryRoot),
@@ -102,9 +113,9 @@ try {
       const sourceHashes = Object.fromEntries(
         sources.map(({ path, text }) => [path, createHash("sha256").update(text).digest("hex")]),
       );
-      return { ready: Object.keys(sourceHashes).length > 0, sourceHashes };
+      return { ready: Object.keys(sourceHashes).length > 0, sourceHashes, targetSystem };
     } catch {
-      return { ready: false, sourceHashes: {} };
+      return { ready: false, sourceHashes: {}, targetSystem };
     }
   };
   if (environment.DATABASE_URL) {

@@ -72,6 +72,10 @@ function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [totalTickets, setTotalTickets] = useState(0);
   const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [queuePage, setQueuePage] = useState(1);
+  const [queueSearch, setQueueSearch] = useState("");
+  const [queueClassification, setQueueClassification] = useState<"bug" | "melhoria" | "">("");
   const [executions, setExecutions] = useState<ImplementationListResult["items"]>([]);
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
   const [environmentCheck, setEnvironmentCheck] = useState<EnvironmentCheck | null>(null);
@@ -116,7 +120,12 @@ function App() {
       const [result, implementationQueue, implementationList, implementationEnvironment] =
         await Promise.all([
           listTickets(ticketQuery),
-          listImplementationQueue(),
+          listImplementationQueue({
+            page: queuePage,
+            pageSize: 10,
+            ...(queueSearch.trim() ? { q: queueSearch.trim() } : {}),
+            ...(queueClassification ? { classification: queueClassification } : {}),
+          }),
           listImplementations(),
           getImplementationEnvironment(),
         ]);
@@ -124,6 +133,8 @@ function App() {
       setTotalTickets(result.total);
       setPage(requestedPage);
       setQueue(implementationQueue.items);
+      setQueueTotal(implementationQueue.total);
+      setQueuePage(implementationQueue.page);
       setExecutions(implementationList.items);
       setEnvironment(implementationEnvironment);
       const nextId = selectedId ?? result.items[0]?.id;
@@ -201,7 +212,7 @@ function App() {
       void refreshTickets(selected?.ticket.id);
     }, 10_000);
     return () => window.clearInterval(timer);
-  }, [executions, page, search, selected?.ticket.id, statusFilter]);
+  }, [executions, page, queueClassification, queuePage, queueSearch, search, selected?.ticket.id, statusFilter]);
 
   useEffect(() => {
     if (!implementation || implementation.execution.status !== "em_andamento") return;
@@ -655,6 +666,41 @@ function App() {
                   : "Ambiente pendente"}
               </span>
             </div>
+            <form
+              className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void refreshTickets(selected?.ticket.id);
+              }}
+            >
+              <input
+                className="field mt-0"
+                onChange={(event) => {
+                  setQueueSearch(event.target.value);
+                  setQueuePage(1);
+                }}
+                placeholder="Buscar na fila"
+                value={queueSearch}
+              />
+              <select
+                className="field mt-0"
+                onChange={(event) => {
+                  setQueueClassification(event.target.value as "bug" | "melhoria" | "");
+                  setQueuePage(1);
+                }}
+                value={queueClassification}
+              >
+                <option value="">Todas as classificações</option>
+                <option value="bug">Bug</option>
+                <option value="melhoria">Melhoria</option>
+              </select>
+              <button
+                className="rounded-lg border border-line px-3 text-sm font-semibold"
+                type="submit"
+              >
+                Filtrar
+              </button>
+            </form>
             {queue.length === 0 ? (
               <p className="mt-3 text-sm text-muted">Nenhum ticket elegível.</p>
             ) : (
@@ -674,6 +720,35 @@ function App() {
                 ))}
               </div>
             )}
+            <div className="mt-4 flex items-center justify-between text-xs text-muted">
+              <span>
+                Página {queuePage} · {queueTotal} ticket{queueTotal === 1 ? "" : "s"}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="rounded border border-line px-2 py-1 disabled:opacity-40"
+                  disabled={queuePage === 1 || loading}
+                  onClick={() => {
+                    setQueuePage(queuePage - 1);
+                    void refreshTickets(selected?.ticket.id);
+                  }}
+                  type="button"
+                >
+                  Anterior
+                </button>
+                <button
+                  className="rounded border border-line px-2 py-1 disabled:opacity-40"
+                  disabled={queuePage * 10 >= queueTotal || loading}
+                  onClick={() => {
+                    setQueuePage(queuePage + 1);
+                    void refreshTickets(selected?.ticket.id);
+                  }}
+                  type="button"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
           </div>
           <div className="mt-8 border-t border-line pt-5">
             <div className="flex items-baseline justify-between gap-3">

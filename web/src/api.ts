@@ -12,6 +12,7 @@ import type {
   ImplementationDetail,
   ImplementationEvents,
   ImplementationListResult,
+  ImplementationQueueInput,
   ImplementationQueueResult,
   EnvironmentCheck,
   PublicEnvironment,
@@ -178,8 +179,10 @@ export function listImplementations(): Promise<ImplementationListResult> {
   return call<ImplementationListResult>("executions.list", { page: 1, pageSize: 20 });
 }
 
-export function listImplementationQueue(): Promise<ImplementationQueueResult> {
-  return call<ImplementationQueueResult>("implementations.queue", { page: 1, pageSize: 20 });
+export function listImplementationQueue(
+  input: ImplementationQueueInput = { page: 1, pageSize: 20 },
+): Promise<ImplementationQueueResult> {
+  return call<ImplementationQueueResult>("implementations.queue", input);
 }
 
 export function startImplementation(input: {

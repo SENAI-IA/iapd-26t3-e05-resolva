@@ -27,7 +27,7 @@
     "kind": "test"
   },
   "testAdapter": "vitest-json",
-  "kiroModel": "substitua-pelo-modelo-disponivel-na-sua-conta",
+  "kiroModel": "gpt-5.6-luna",
   "maxRounds": 3,
   "runTimeoutSeconds": 1800,
   "commandTimeoutSeconds": 300,

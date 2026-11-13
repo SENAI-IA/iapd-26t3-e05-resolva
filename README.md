@@ -49,10 +49,11 @@ corepack prepare pnpm@10.28.2 --activate
 pnpm install --frozen-lockfile
 cp .env.example .env
 # Edite .env e escolha uma senha local antes de iniciar o banco.
-pnpm db:up
-pnpm db:migrate
+pnpm setup
 pnpm dev
 ```
+
+A API e o frontend iniciam após o banco estar disponível. O comando `pnpm setup` cria `resolva.config.json` a partir do exemplo sem sobrescrever uma configuração existente, inicia o PostgreSQL, aplica as migrações e cadastra tickets de demonstração de forma idempotente. A configuração de exemplo usa o modelo local padrão `gpt-5.6-luna`; credenciais do Kiro continuam somente no ambiente por meio de `KIRO_API_KEY`.
 
 A interface abre em `http://127.0.0.1:5173`. A API escuta em `http://127.0.0.1:3000`; `GET /rest/health` devolve `{"status":"ok"}`. O Vite encaminha `/rest` e `/trpc` para a API. Host e Origin são restritos ao ambiente local, com headers de proxy desabilitados conforme a [configuração do Fastify](https://fastify.dev/docs/latest/Reference/Server/#trustproxy).
 

@@ -10,8 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "config:prepare": "tsx --env-file-if-exists=../.env src/config/prepare-cli.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file-if-exists=../.env src/db/migrate-cli.ts"
+    "db:migrate": "tsx --env-file-if-exists=../.env src/db/migrate-cli.ts",
+    "db:seed": "tsx --env-file-if-exists=../.env src/db/seed-cli.ts"
   },
   "dependencies": {
     "@trpc/server": "^11.25.0",

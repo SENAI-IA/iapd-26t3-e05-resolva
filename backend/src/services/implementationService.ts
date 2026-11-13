@@ -10,6 +10,7 @@ import {
   type ImplementationEventsInput,
   type ImplementationListInput,
   type ImplementationQueueInput,
+  type RetryImplementationInput,
   type StartImplementationInput,
 } from "../domain/implementationContracts.js";
 import type { ImplementationRepository } from "../repository/implementationRepository.js";
@@ -350,6 +351,13 @@ export function createImplementationService(
       } catch {
         throw new DomainError("PRECONDITION_FAILED", "O artefato da execução está indisponível.");
       }
+    },
+    async retry(input: RetryImplementationInput) {
+      await assertInstanceOwned();
+      const current = await currentEnvironment();
+      const { id, reservation } = await repository.retry(input, current);
+      if (reservation) await dispatchWorkflow(reservation);
+      return { implementationExecutionId: id };
     },
     async start(input: StartImplementationInput) {
       await assertInstanceOwned();

@@ -65,6 +65,12 @@ export const startImplementationSchema = ticketIdentitySchema.extend({
   requestKey: z.uuid(),
 });
 export type StartImplementationInput = z.infer<typeof startImplementationSchema>;
+export const retryImplementationSchema = z.strictObject({
+  executionId: z.uuid(),
+  requestKey: z.uuid(),
+});
+export type RetryImplementationInput = z.infer<typeof retryImplementationSchema>;
+
 export const startImplementationResultSchema = z.strictObject({
   implementationExecutionId: z.uuid(),
 });

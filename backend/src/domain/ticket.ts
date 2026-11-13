@@ -17,6 +17,12 @@ export type TicketAction =
       environment: ImplementationEnvironment;
     }
   | {
+      type: "retry_implementation";
+      ticket: ImplementationTicket;
+      triage: ImplementationTriage | null;
+      environment: ImplementationEnvironment;
+    }
+  | {
       type: "request_changes";
       kind: "behavior" | "refinement";
       message: string;
@@ -57,6 +63,19 @@ export function transitionTicket(current: TicketStatus, action: TicketAction): T
     case "reopen":
       if (current === "resolvido") return "aberto";
       break;
+    case "retry_implementation": {
+      if (current !== action.ticket.status || current !== "aberto") break;
+      const eligibility = canStartImplementation(
+        { ...action.ticket, status: "aguardando_implementacao" },
+        action.triage,
+        action.environment,
+      );
+      if (eligibility.eligible) return "em_andamento";
+      throw new DomainError(
+        eligibility.code === "PRECONDITION_FAILED" ? "PRECONDITION_FAILED" : "CONFLICT",
+        eligibility.message,
+      );
+    }
     case "request_changes":
       if (current === "aguardando_revisao") return "aberto";
       break;

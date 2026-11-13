@@ -27,6 +27,7 @@ import {
   type ImplementationListResult,
   type ImplementationQueueInput,
   type ImplementationQueueResult,
+  type RetryImplementationInput,
   type StartImplementationInput,
 } from "../domain/implementationContracts.js";
 import { DomainError } from "../domain/error.js";
@@ -742,9 +743,134 @@ export function createImplementationRepository(database: AppDatabase) {
           },
         };
       });
+    async retry(input: RetryImplementationInput, environment: RuntimeEnvironment) {
+      return database.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ id: executions.id, kind: executions.kind, ticketId: executions.ticketId })
+          .from(executions)
+          .where(eq(executions.requestKey, input.requestKey));
+        if (existing) {
+          if (existing.kind !== "implementation")
+            throw new DomainError("CONFLICT", "A chave já pertence a outra intenção de execução.");
+          return { id: existing.id, reservation: null };
+        }
+        const [row] = await tx
+          .select({ execution: executions, ticket: tickets })
+          .from(executions)
+          .innerJoin(tickets, eq(tickets.id, executions.ticketId))
+          .where(and(eq(executions.id, input.executionId), eq(executions.kind, "implementation")))
+          .for("update");
+        if (!row) throw new DomainError("NOT_FOUND", "Execução de implementação não encontrada.");
+        if (!["falhou", "bloqueada", "interrompida"].includes(row.execution.status))
+          throw new DomainError("CONFLICT", "Somente execuções encerradas podem ser repetidas.");
+        if (row.ticket.status !== "aberto" || row.ticket.version !== row.execution.ticketVersion)
+          throw new DomainError("CONFLICT", "O ticket foi alterado e exige nova triagem.");
+        const activeId = await activeExecutionId(tx);
+        const triage = await findTriage(tx, row.ticket);
+        const nextStatus = transitionTicket(row.ticket.status, {
+          type: "retry_implementation",
+          ticket: toImplementationTicket(toTicket(row.ticket, triage)),
+          triage: toImplementationTriage(triage),
+          environment: { ...environment, activeExecutionId: activeId },
+        });
+        const config = deliveryConfigSchema.safeParse(row.execution.configSnapshot);
+        if (!config.success || !row.execution.deliveryId)
+          throw new DomainError("PRECONDITION_FAILED", "A entrega anterior não pode ser repetida.");
+        const [delivery] = await tx
+          .select()
+          .from(deliveries)
+          .where(eq(deliveries.id, row.execution.deliveryId))
+          .for("update");
+        if (!delivery)
+          throw new DomainError("PRECONDITION_FAILED", "A entrega anterior não está disponível.");
+        const triageSnapshot = triage
+          ? {
+              id: triage.id,
+              ticketId: triage.ticketId,
+              ticketVersion: triage.ticketVersion,
+              classification: triage.classification,
+              status: triage.status,
+              sourceHashes: triage.sourceHashes,
+              changeScope: triage.changeScope,
+              acceptanceCriteria: triage.acceptanceCriteria,
+              regressionTestPlan: triage.regressionTestPlan,
+            }
+          : null;
+        const ticketSnapshot = {
+          id: row.ticket.id,
+          version: row.ticket.version,
+          targetSystemKey: row.ticket.targetSystemKey,
+          targetConfigVersion: row.ticket.targetConfigVersion,
+          title: row.ticket.title,
+          description: row.ticket.description,
+          expectedBehavior: row.ticket.expectedBehavior,
+          reproductionSteps: row.ticket.reproductionSteps,
+          category: row.ticket.category,
+          classification: row.ticket.classification,
+          triage: triageSnapshot,
+        };
+        const [created] = await tx
+          .insert(executions)
+          .values({
+            ticketId: row.ticket.id,
+            ticketVersion: row.ticket.version,
+            kind: "implementation",
+            triageId: triage?.id,
+            deliveryId: delivery.id,
+            previousExecutionId: row.execution.id,
+            requestKey: input.requestKey,
+            mode: "retry",
+            round: row.execution.round,
+            stage: "preparando_ambiente",
+            ticketSnapshot,
+            configSnapshot: row.execution.configSnapshot,
+            startedAt: sql`clock_timestamp()`,
+          })
+          .onConflictDoNothing()
+          .returning({ id: executions.id });
+        if (!created) {
+          const [concurrent] = await tx
+            .select({ id: executions.id })
+            .from(executions)
+            .where(eq(executions.requestKey, input.requestKey));
+          if (concurrent) return { id: concurrent.id, reservation: null };
+          throw new DomainError("CONFLICT", "Outra execução foi reservada.");
+        }
+        await tx
+          .update(tickets)
+          .set({ status: nextStatus, updatedAt: sql`clock_timestamp()` })
+          .where(eq(tickets.id, row.ticket.id));
+        await tx.insert(ticketEvents).values({
+          ticketId: row.ticket.id,
+          type: "implementation_retried",
+          fromStatus: row.ticket.status,
+          toStatus: nextStatus,
+          message: "Nova tentativa de implementação iniciada.",
+          payload: { executionId: created.id, previousExecutionId: row.execution.id },
+          createdAt: sql`clock_timestamp()`,
+        });
+        await tx.insert(executionEvents).values({
+          executionId: created.id,
+          sequence: 1,
+          type: "started",
+          stage: "preparando_ambiente",
+          message: "Nova tentativa de implementação reservada.",
+        });
+        return {
+          id: created.id,
+          reservation: {
+            executionId: created.id,
+            deliveryId: delivery.id,
+            branchName: delivery.branchName,
+            ticketId: row.ticket.id,
+            triageId: triage?.id ?? null,
+            ticketSnapshot,
+            configSnapshot: row.execution.configSnapshot,
+          },
+        };
+      });
     },
   };
-}
 
 export type ImplementationRepository = ReturnType<typeof createImplementationRepository>;
 export type ImplementationReservation = NonNullable<

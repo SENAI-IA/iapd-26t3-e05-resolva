@@ -12,6 +12,7 @@ import {
   implementationQueueInputSchema,
   implementationQueueResultSchema,
   publicEnvironmentSchema,
+  retryImplementationSchema,
   startImplementationResultSchema,
   startImplementationSchema,
 } from "../../domain/implementationContracts.js";
@@ -36,6 +37,10 @@ export const implementationsRouter = router({
     .input(implementationQueueInputSchema.optional())
     .output(implementationQueueResultSchema)
     .query(({ ctx, input }) => ctx.implementations.queue(input)),
+  retry: implementationProcedure
+    .input(retryImplementationSchema)
+    .output(startImplementationResultSchema)
+    .mutation(({ ctx, input }) => ctx.implementations.retry(input)),
   start: implementationProcedure
     .input(startImplementationSchema)
     .output(startImplementationResultSchema)

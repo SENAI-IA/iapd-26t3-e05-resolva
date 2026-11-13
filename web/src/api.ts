@@ -201,6 +201,13 @@ export function listImplementationQueue(
   return call<ImplementationQueueResult>("implementations.queue", input);
 }
 
+export function retryImplementation(input: {
+  executionId: string;
+  requestKey: string;
+}): Promise<StartImplementationResult> {
+  return call<StartImplementationResult>("implementations.retry", input, true);
+}
+
 export function startImplementation(input: {
   ticketId: number;
   expectedVersion: number;

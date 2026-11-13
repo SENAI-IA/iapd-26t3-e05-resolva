@@ -38,6 +38,7 @@ import {
   provideTicketInformation,
   reconcileDispatch,
   requestTicketChanges,
+  retryImplementation,
   reopenTicket,
   resolveTicket,
   startImplementation,
@@ -404,6 +405,24 @@ function App() {
     }
   }
 
+  async function retrySelectedImplementation() {
+    if (!implementation) return;
+    setAction("retry");
+    setError(null);
+    try {
+      await retryImplementation({
+        executionId: implementation.execution.id,
+        requestKey: crypto.randomUUID(),
+      });
+      setNotice("Nova tentativa de implementação solicitada.");
+      await refreshTickets(selected?.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível repetir a implementação.");
+    } finally {
+      setAction(null);
+    }
+  }
+
   async function implementTicket() {
     if (!selected) return;
     setAction("implementation");
@@ -579,6 +598,10 @@ function App() {
     selected?.ticket.status === "aberto" || selected?.ticket.status === "aguardando_informacoes";
   const canImplement =
     selected?.ticket.status === "aguardando_implementacao" && triage?.status === "valid";
+  const canRetry =
+    selected?.ticket.status === "aberto" &&
+    implementation !== null &&
+    ["falhou", "bloqueada", "interrompida"].includes(implementation.execution.status);
   const configuredCategories = environment?.targetSystem?.categories ?? [];
 
   return (
@@ -1593,6 +1616,16 @@ function App() {
                     type="button"
                   >
                     {action === "implementation" ? "Solicitando..." : "Iniciar implementação"}
+                  </button>
+                ) : null}
+                {canRetry ? (
+                  <button
+                    className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    disabled={action !== null}
+                    onClick={() => void retrySelectedImplementation()}
+                    type="button"
+                  >
+                    {action === "retry" ? "Repetindo..." : "Repetir implementação"}
                   </button>
                 ) : null}
                 {implementation?.execution.workflowId ? (

@@ -13,8 +13,9 @@ import type {
 } from "../../backend/src/domain/implementationContracts.js";
 import type { TriageDetail } from "../../backend/src/domain/triageContracts.js";
 import {
-  createTicket,
   contestTriage,
+  createTicket,
+  collectImplementationReport,
   getImplementation,
   getImplementationEnvironment,
   getTicket,
@@ -275,6 +276,21 @@ function App() {
       if (selected) await refreshTickets(selected.ticket.id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível reconciliar a workflow.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function collectImplementationReportResult() {
+    if (!implementation) return;
+    setAction("collect-report");
+    setError(null);
+    try {
+      await collectImplementationReport(implementation.execution.id);
+      setNotice("Relatório da pipeline coletado.");
+      if (selected) await refreshTickets(selected.ticket.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível coletar o relatório.");
     } finally {
       setAction(null);
     }
@@ -1022,6 +1038,16 @@ function App() {
                     type="button"
                   >
                     {action === "reconcile" ? "Consultando..." : "Atualizar execução"}
+                  </button>
+                ) : null}
+                {implementation?.execution.workflowId ? (
+                  <button
+                    className="rounded-lg border border-line px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    disabled={action !== null}
+                    onClick={() => void collectImplementationReportResult()}
+                    type="button"
+                  >
+                    {action === "collect-report" ? "Coletando..." : "Coletar relatório"}
                   </button>
                 ) : null}
                 {selected.currentDelivery?.prUrl ? (

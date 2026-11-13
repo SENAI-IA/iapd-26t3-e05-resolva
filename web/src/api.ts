@@ -7,9 +7,10 @@ import type {
   TicketList,
 } from "../../backend/src/domain/contracts.js";
 import type {
+  ImplementationCallbackResult,
+  ImplementationDetail,
   ImplementationListResult,
   ImplementationQueueResult,
-  ImplementationDetail,
   PublicEnvironment,
   StartImplementationResult,
 } from "../../backend/src/domain/implementationContracts.js";
@@ -116,6 +117,12 @@ export function reconcileDispatch(input: {
   workflowId: string;
 }): Promise<DispatchReconciliationResult> {
   return call<DispatchReconciliationResult>("implementations.reconcileDispatch", input, true);
+}
+
+export function collectImplementationReport(
+  executionId: string,
+): Promise<ImplementationCallbackResult> {
+  return call<ImplementationCallbackResult>("implementations.collectReport", { executionId }, true);
 }
 
 export function getImplementationEnvironment(): Promise<PublicEnvironment> {

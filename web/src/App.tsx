@@ -76,6 +76,7 @@ function App() {
   const [implementationEvents, setImplementationEvents] = useState<ImplementationEvents["items"]>(
     [],
   );
+  const [implementationEventCursor, setImplementationEventCursor] = useState(0);
   const [validationReport, setValidationReport] = useState<string | null>(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [form, setForm] = useState<TicketContent>(emptyForm);
@@ -138,11 +139,13 @@ function App() {
         setTriage(currentTriage);
         setImplementation(currentImplementation);
         setImplementationEvents(currentImplementationEvents?.items ?? []);
+        setImplementationEventCursor(currentImplementationEvents?.nextSequence ?? 0);
       } else {
         setSelected(null);
         setTriage(null);
         setImplementation(null);
         setImplementationEvents([]);
+        setImplementationEventCursor(0);
         setValidationReport(null);
         setEvents([]);
       }
@@ -151,6 +154,25 @@ function App() {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar os tickets.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function pollImplementationEvents() {
+    if (!implementation || implementation.execution.status !== "em_andamento") return;
+    try {
+      const result = await getImplementationEvents(
+        implementation.execution.id,
+        implementationEventCursor,
+      );
+      if (result.items.length > 0) {
+        setImplementationEvents((current) => {
+          const known = new Set(current.map((event) => event.id));
+          return [...current, ...result.items.filter((event) => !known.has(event.id))];
+        });
+      }
+      setImplementationEventCursor(result.nextSequence);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível atualizar os eventos.");
     }
   }
 
@@ -165,6 +187,14 @@ function App() {
     }, 10_000);
     return () => window.clearInterval(timer);
   }, [executions, page, search, selected?.ticket.id, statusFilter]);
+
+  useEffect(() => {
+    if (!implementation || implementation.execution.status !== "em_andamento") return;
+    const timer = window.setInterval(() => {
+      void pollImplementationEvents();
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [implementation, implementationEventCursor]);
 
   async function selectTicket(ticketId: number) {
     setAction(null);
@@ -189,6 +219,7 @@ function App() {
       setTriage(currentTriage);
       setImplementation(currentImplementation);
       setImplementationEvents(currentImplementationEvents?.items ?? []);
+      setImplementationEventCursor(currentImplementationEvents?.nextSequence ?? 0);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o ticket.");
@@ -577,6 +608,28 @@ function App() {
                 ? `${environment.sourceCount} fonte${environment.sourceCount === 1 ? "" : "s"} autorizada${environment.sourceCount === 1 ? "" : "s"} para análise.`
                 : "Configure as fontes autorizadas para habilitar as execuções."}
             </p>
+            {environment?.targetSystem ? (
+              <dl className="mt-4 grid gap-3 text-xs text-muted">
+                <div>
+                  <dt>Repositório</dt>
+                  <dd className="mt-1 break-all font-semibold text-ink">
+                    {environment.targetSystem.repository}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Branch base</dt>
+                  <dd className="mt-1 font-semibold text-ink">
+                    {environment.targetSystem.baseBranch}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Workflow</dt>
+                  <dd className="mt-1 break-all font-semibold text-ink">
+                    {environment.targetSystem.workflowRef}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
           </div>
           <div className="mt-8 border-t border-line pt-5">
             <div className="flex items-baseline justify-between gap-3">

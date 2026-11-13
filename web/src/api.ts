@@ -111,13 +111,16 @@ export function startTriage(input: StartTriageInput): Promise<StartTriageResult>
 }
 
 export function getImplementation(executionId: string): Promise<ImplementationDetail> {
-  return call<ImplementationDetail>("implementations.byId", { executionId });
+  return call<ImplementationDetail>("executions.byId", { executionId });
 }
 
-export function getImplementationEvents(executionId: string): Promise<ImplementationEvents> {
-  return call<ImplementationEvents>("implementations.events", {
+export function getImplementationEvents(
+  executionId: string,
+  afterSequence = 0,
+): Promise<ImplementationEvents> {
+  return call<ImplementationEvents>("executions.events", {
     executionId,
-    afterSequence: 0,
+    afterSequence,
     limit: 100,
   });
 }
@@ -126,7 +129,7 @@ export function getImplementationArtifact(
   executionId: string,
   artifactId: string,
 ): Promise<ImplementationArtifactResult> {
-  return call<ImplementationArtifactResult>("implementations.artifact", {
+  return call<ImplementationArtifactResult>("executions.artifact", {
     executionId,
     artifactId,
   });
@@ -150,7 +153,7 @@ export function getImplementationEnvironment(): Promise<PublicEnvironment> {
 }
 
 export function listImplementations(): Promise<ImplementationListResult> {
-  return call<ImplementationListResult>("implementations.list", { page: 1, pageSize: 20 });
+  return call<ImplementationListResult>("executions.list", { page: 1, pageSize: 20 });
 }
 
 export function listImplementationQueue(): Promise<ImplementationQueueResult> {

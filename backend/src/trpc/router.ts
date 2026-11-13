@@ -1,3 +1,4 @@
+import { environmentRouter } from "./routers/environment.js";
 import { executionsRouter } from "./routers/executions.js";
 import { implementationsRouter } from "./routers/implementations.js";
 import { router } from "./core.js";
@@ -9,5 +10,6 @@ export const appRouter = router({
   triages: triagesRouter,
   implementations: implementationsRouter,
   executions: executionsRouter,
+  environment: environmentRouter,
 });
 export type AppRouter = typeof appRouter;

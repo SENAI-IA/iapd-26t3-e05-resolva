@@ -10,12 +10,14 @@ import type {
   ImplementationEvents,
   ImplementationListResult,
   ImplementationQueueResult,
+  EnvironmentCheck,
   PublicEnvironment,
 } from "../../backend/src/domain/implementationContracts.js";
 import type { TriageDetail } from "../../backend/src/domain/triageContracts.js";
 import {
   contestTriage,
   createTicket,
+  checkImplementationEnvironment,
   collectImplementationReport,
   getImplementation,
   getImplementationArtifact,
@@ -71,6 +73,7 @@ function App() {
   const [queue, setQueue] = useState<ImplementationQueueResult["items"]>([]);
   const [executions, setExecutions] = useState<ImplementationListResult["items"]>([]);
   const [environment, setEnvironment] = useState<PublicEnvironment | null>(null);
+  const [environmentCheck, setEnvironmentCheck] = useState<EnvironmentCheck | null>(null);
   const [selected, setSelected] = useState<TicketDetails | null>(null);
   const [triage, setTriage] = useState<TriageDetail | null>(null);
   const [implementation, setImplementation] = useState<ImplementationDetail | null>(null);
@@ -225,6 +228,20 @@ function App() {
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o ticket.");
+    }
+  }
+
+  async function checkEnvironment() {
+    setAction("environment-check");
+    setError(null);
+    try {
+      const result = await checkImplementationEnvironment();
+      setEnvironmentCheck(result);
+      setNotice(result.message);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível verificar o ambiente.");
+    } finally {
+      setAction(null);
     }
   }
 
@@ -654,6 +671,25 @@ function App() {
                   </dd>
                 </div>
               </dl>
+            ) : null}
+            <button
+              className="mt-4 rounded-lg border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50"
+              disabled={action !== null}
+              onClick={() => void checkEnvironment()}
+              type="button"
+            >
+              {action === "environment-check" ? "Verificando..." : "Verificar ambiente"}
+            </button>
+            {environmentCheck ? (
+              <div className="mt-4 rounded-lg bg-canvas p-3 text-xs text-muted">
+                <p className="font-semibold text-ink">{environmentCheck.message}</p>
+                <ul className="mt-2 space-y-1">
+                  <li>Configuração: {environmentCheck.targetConfigured ? "OK" : "Pendente"}</li>
+                  <li>Fontes: {environmentCheck.sourcesReady ? "OK" : "Pendente"}</li>
+                  <li>GitHub CLI: {environmentCheck.githubInstalled ? "Instalado" : "Ausente"}</li>
+                  <li>Autenticação GitHub: {environmentCheck.githubAuthenticated ? "OK" : "Pendente"}</li>
+                </ul>
+              </div>
             ) : null}
           </div>
           <div className="mt-8 border-t border-line pt-5">

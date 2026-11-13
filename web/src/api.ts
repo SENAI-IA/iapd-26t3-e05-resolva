@@ -13,6 +13,7 @@ import type {
   ImplementationEvents,
   ImplementationListResult,
   ImplementationQueueResult,
+  EnvironmentCheck,
   PublicEnvironment,
   StartImplementationResult,
 } from "../../backend/src/domain/implementationContracts.js";
@@ -158,7 +159,11 @@ export function collectImplementationReport(
 }
 
 export function getImplementationEnvironment(): Promise<PublicEnvironment> {
-  return call<PublicEnvironment>("implementations.environment");
+  return call<PublicEnvironment>("environment.get");
+}
+
+export function checkImplementationEnvironment(): Promise<EnvironmentCheck> {
+  return call<EnvironmentCheck>("environment.check");
 }
 
 export function listImplementations(): Promise<ImplementationListResult> {

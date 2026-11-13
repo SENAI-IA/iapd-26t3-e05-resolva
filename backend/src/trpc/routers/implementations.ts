@@ -20,6 +20,7 @@ import {
   dispatchReconciliationInputSchema,
   dispatchReconciliationResultSchema,
 } from "../../domain/implementationDispatch.js";
+import { environmentCheckSchema } from "../../domain/implementationContracts.js";
 import { implementationProcedure, router } from "../core.js";
 
 export const implementationsRouter = router({
@@ -27,6 +28,10 @@ export const implementationsRouter = router({
     .input(z.undefined().optional())
     .output(publicEnvironmentSchema)
     .query(({ ctx }) => ctx.implementations.environment()),
+  environmentCheck: implementationProcedure
+    .input(z.undefined().optional())
+    .output(environmentCheckSchema)
+    .query(({ ctx }) => ctx.implementations.environmentCheck()),
   queue: implementationProcedure
     .input(implementationQueueInputSchema.optional())
     .output(implementationQueueResultSchema)

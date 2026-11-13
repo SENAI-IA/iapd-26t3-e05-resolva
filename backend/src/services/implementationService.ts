@@ -200,6 +200,42 @@ export function createImplementationService(
         targetSystem: current.targetSystem ?? null,
       };
     },
+    async environmentCheck() {
+      const current = await currentEnvironment();
+      const targetConfigured = current.targetSystem !== undefined && current.targetSystem !== null;
+      let githubInstalled = false;
+      let githubAuthenticated = false;
+      if (github) {
+        try {
+          const availability = await github.checkAvailability();
+          githubInstalled = availability.installed;
+          githubAuthenticated = availability.authenticated;
+        } catch {
+          githubInstalled = false;
+          githubAuthenticated = false;
+        }
+      }
+      const ready = current.ready && targetConfigured && githubInstalled && githubAuthenticated;
+      const message = ready
+        ? "Ambiente pronto para iniciar implementações."
+        : !targetConfigured
+          ? "Configure um sistema-alvo válido."
+          : !current.ready
+            ? "As fontes autorizadas ainda não estão disponíveis."
+            : !githubInstalled
+              ? "Instale o GitHub CLI (gh)."
+              : !githubAuthenticated
+                ? "Autentique o GitHub CLI (gh)."
+                : "O ambiente ainda não está pronto.";
+      return {
+        ready,
+        targetConfigured,
+        sourcesReady: current.ready,
+        githubInstalled,
+        githubAuthenticated,
+        message,
+      };
+    },
     async queue(input?: ImplementationQueueInput) {
       const current = await currentEnvironment();
       return repository.queue(input ?? implementationQueueInputSchema.parse({}), current);

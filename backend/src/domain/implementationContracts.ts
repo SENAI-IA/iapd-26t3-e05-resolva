@@ -31,6 +31,16 @@ export const publicEnvironmentSchema = z.strictObject({
 });
 export type PublicEnvironment = z.infer<typeof publicEnvironmentSchema>;
 
+export const environmentCheckSchema = z.strictObject({
+  ready: z.boolean(),
+  targetConfigured: z.boolean(),
+  sourcesReady: z.boolean(),
+  githubInstalled: z.boolean(),
+  githubAuthenticated: z.boolean(),
+  message: z.string().min(1),
+});
+export type EnvironmentCheck = z.infer<typeof environmentCheckSchema>;
+
 export const implementationQueueSchema = z.strictObject({
   ticket: ticketSchema,
   eligibility: eligibilityResultSchema,
